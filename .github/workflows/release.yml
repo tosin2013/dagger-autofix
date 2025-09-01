@@ -349,8 +349,9 @@ jobs:
         name: release-binaries
         path: binaries/
         retention-days: 30
-        compression-level: 9  build-co
-ntainer:
+        compression-level: 9
+
+  build-container:
     name: Build and Publish Container Image
     runs-on: ubuntu-latest
     needs: validate-version
@@ -500,8 +501,9 @@ ntainer:
         path: |
           trivy-results.sarif
           trivy-results.txt
-        retention-days: 30  va
-lidate-dagger-module:
+        retention-days: 30
+
+  validate-dagger-module:
     name: Validate Dagger Module
     runs-on: ubuntu-latest
     needs: validate-version
@@ -771,8 +773,9 @@ lidate-dagger-module:
       with:
         name: daggerverse-publication
         path: daggerverse-publication.md
-        retention-days: 90  crea
-te-github-release:
+        retention-days: 90
+
+  create-github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [validate-version, aggregate-binaries, build-container, scan-container, validate-dagger-module]

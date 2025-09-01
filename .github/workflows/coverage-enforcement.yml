@@ -253,19 +253,19 @@ jobs:
         go tool cover -func=coverage-validation/coverage-merged.out > coverage-validation/analysis/function-coverage.txt
         
         # Create detailed analysis
-        cat > coverage-validation/analysis/detailed-analysis.md <<EOF
-# Detailed Coverage Analysis Report
-
-## Summary
-- **Current Coverage**: ${{ steps.calculate-coverage.outputs.coverage }}%
-- **Threshold**: ${{ env.COVERAGE_THRESHOLD }}%
-- **Status**: ${{ steps.validate-coverage.outputs.status }}
-- **Baseline Comparison**: ${{ steps.baseline-check.outputs.comparison }}
-
-## Coverage Breakdown
-
-### Functions by Coverage Level
-EOF
+        cat > coverage-validation/analysis/detailed-analysis.md <<'EOF'
+        # Detailed Coverage Analysis Report
+        
+        ## Summary
+        - **Current Coverage**: ${{ steps.calculate-coverage.outputs.coverage }}%
+        - **Threshold**: ${{ env.COVERAGE_THRESHOLD }}%
+        - **Status**: ${{ steps.validate-coverage.outputs.status }}
+        - **Baseline Comparison**: ${{ steps.baseline-check.outputs.comparison }}
+        
+        ## Coverage Breakdown
+        
+        ### Functions by Coverage Level
+        EOF
         
         # Analyze function coverage levels
         echo "#### Excellent Coverage (>= 90%)" >> coverage-validation/analysis/detailed-analysis.md
@@ -277,7 +277,7 @@ EOF
         echo "" >> coverage-validation/analysis/detailed-analysis.md
         
         echo "#### Poor Coverage (1-69%)" >> coverage-validation/analysis/detailed-analysis.md
-        awk '$3 != "total:" && $3 > "0.0%" && $3 < "70.0%" {count++} END {print "Functions: " (count ? count : 0)}' coverage-validation/analysis/detailed-analysis.md >> coverage-validation/analysis/detailed-analysis.md
+        awk '$3 != "total:" && $3 > "0.0%" && $3 < "70.0%" {count++} END {print "Functions: " (count ? count : 0)}' coverage-validation/analysis/function-coverage.txt >> coverage-validation/analysis/detailed-analysis.md
         echo "" >> coverage-validation/analysis/detailed-analysis.md
         
         echo "#### No Coverage (0%)" >> coverage-validation/analysis/detailed-analysis.md
@@ -306,58 +306,58 @@ EOF
         validation_result=${{ steps.validate-coverage.outputs.validation_result }}
         
         # Create enforcement report
-        cat > coverage-validation/enforcement/enforcement-report.md <<EOF
-# Coverage Enforcement Report
-
-Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-Commit: ${{ github.sha }}
-Branch: ${{ github.ref_name }}
-
-## Enforcement Results
-
-### Threshold Validation
-- **Required Coverage**: ${threshold}%
-- **Actual Coverage**: ${current_coverage}%
-- **Result**: ${{ steps.validate-coverage.outputs.status }}
-- **Gap**: $(echo "$threshold - $current_coverage" | bc -l)%
-
-### Baseline Comparison
-${{ steps.baseline-check.outputs.comparison }}
-
-### Enforcement Actions
-EOF
+        cat > coverage-validation/enforcement/enforcement-report.md <<'EOF'
+        # Coverage Enforcement Report
+        
+        Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        Commit: ${{ github.sha }}
+        Branch: ${{ github.ref_name }}
+        
+        ## Enforcement Results
+        
+        ### Threshold Validation
+        - **Required Coverage**: ${threshold}%
+        - **Actual Coverage**: ${current_coverage}%
+        - **Result**: ${{ steps.validate-coverage.outputs.status }}
+        - **Gap**: $(echo "$threshold - $current_coverage" | bc -l)%
+        
+        ### Baseline Comparison
+        ${{ steps.baseline-check.outputs.comparison }}
+        
+        ### Enforcement Actions
+        EOF
         
         if [ "$validation_result" -eq 0 ]; then
-          cat >> coverage-validation/enforcement/enforcement-report.md <<EOF
-✅ **PASSED**: Coverage meets or exceeds the required threshold.
-
-#### Actions Taken:
-- Coverage validation successful
-- Build allowed to proceed
-- Coverage metrics recorded
-EOF
+          cat >> coverage-validation/enforcement/enforcement-report.md <<'EOF'
+          ✅ **PASSED**: Coverage meets or exceeds the required threshold.
+          
+          #### Actions Taken:
+          - Coverage validation successful
+          - Build allowed to proceed
+          - Coverage metrics recorded
+          EOF
         else
-          cat >> coverage-validation/enforcement/enforcement-report.md <<EOF
-❌ **FAILED**: Coverage is below the required threshold.
-
-#### Actions Taken:
-- Coverage validation failed
-- Build blocked (in strict mode)
-- Detailed analysis generated
-- Recommendations provided
-
-#### Recommendations:
-1. Add unit tests for uncovered functions
-2. Improve integration test coverage
-3. Review and enhance functional tests
-4. Consider refactoring complex functions for better testability
-
-#### Next Steps:
-- Review the detailed coverage analysis
-- Identify critical uncovered code paths
-- Prioritize test additions based on code importance
-- Re-run tests after adding coverage
-EOF
+          cat >> coverage-validation/enforcement/enforcement-report.md <<'EOF'
+          ❌ **FAILED**: Coverage is below the required threshold.
+          
+          #### Actions Taken:
+          - Coverage validation failed
+          - Build blocked (in strict mode)
+          - Detailed analysis generated
+          - Recommendations provided
+          
+          #### Recommendations:
+          1. Add unit tests for uncovered functions
+          2. Improve integration test coverage
+          3. Review and enhance functional tests
+          4. Consider refactoring complex functions for better testability
+          
+          #### Next Steps:
+          - Review the detailed coverage analysis
+          - Identify critical uncovered code paths
+          - Prioritize test additions based on code importance
+          - Re-run tests after adding coverage
+          EOF
         fi
         
         echo "✅ Coverage enforcement report generated"
@@ -370,16 +370,16 @@ EOF
         current_coverage=${{ steps.calculate-coverage.outputs.coverage }}
         
         # Create new baseline
-        cat > "${{ env.COVERAGE_BASELINE_FILE }}" <<EOF
-{
-  "coverage": $current_coverage,
-  "date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "commit": "${{ github.sha }}",
-  "branch": "${{ github.ref_name }}",
-  "threshold": ${{ env.COVERAGE_THRESHOLD }},
-  "updated_by": "coverage-enforcement-workflow"
-}
-EOF
+        cat > "${{ env.COVERAGE_BASELINE_FILE }}" <<'EOF'
+        {
+          "coverage": $current_coverage,
+          "date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+          "commit": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "threshold": ${{ env.COVERAGE_THRESHOLD }},
+          "updated_by": "coverage-enforcement-workflow"
+        }
+        EOF
         
         echo "✅ Coverage baseline updated to ${current_coverage}%"
     
@@ -388,17 +388,17 @@ EOF
         echo "📈 Creating coverage trend data..."
         
         # Create trend entry
-        trend_entry=$(cat <<EOF
-{
-  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
-  "commit": "${{ github.sha }}",
-  "branch": "${{ github.ref_name }}",
-  "coverage": ${{ steps.calculate-coverage.outputs.coverage }},
-  "threshold": ${{ env.COVERAGE_THRESHOLD }},
-  "status": "${{ steps.validate-coverage.outputs.status }}",
-  "baseline_change": "${{ steps.baseline-check.outputs.change || 0 }}"
-}
-EOF
+        trend_entry=$(cat <<'EOF'
+        {
+          "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+          "commit": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "coverage": ${{ steps.calculate-coverage.outputs.coverage }},
+          "threshold": ${{ env.COVERAGE_THRESHOLD }},
+          "status": "${{ steps.validate-coverage.outputs.status }}",
+          "baseline_change": "${{ steps.baseline-check.outputs.change || 0 }}"
+        }
+        EOF
         )
         
         # Save trend data
@@ -523,18 +523,18 @@ EOF
         mkdir -p coverage-trends
         
         # Create trend analysis report
-        cat > coverage-trends/trend-analysis.md <<EOF
-# Coverage Trend Analysis
-        
-Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        
-## Current Status
-- **Coverage**: ${{ needs.coverage-validation.outputs.coverage-percentage }}%
-- **Status**: ${{ needs.coverage-validation.outputs.coverage-status }}
-- **Baseline**: ${{ needs.coverage-validation.outputs.baseline-comparison }}
-        
-## Historical Context
-EOF
+        cat > coverage-trends/trend-analysis.md <<'EOF'
+        # Coverage Trend Analysis
+                
+        Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+                
+        ## Current Status
+        - **Coverage**: ${{ needs.coverage-validation.outputs.coverage-percentage }}%
+        - **Status**: ${{ needs.coverage-validation.outputs.coverage-status }}
+        - **Baseline**: ${{ needs.coverage-validation.outputs.baseline-comparison }}
+                
+        ## Historical Context
+        EOF
         
         # Analyze recent commits for coverage trends
         echo "### Recent Commits Impact" >> coverage-trends/trend-analysis.md
@@ -551,26 +551,26 @@ EOF
         current_coverage=${{ needs.coverage-validation.outputs.coverage-percentage }}
         
         if (( $(echo "$current_coverage < 85" | bc -l) )); then
-          cat >> coverage-trends/trend-analysis.md <<EOF
-        
-### 🎯 Priority Actions
-1. **Immediate**: Add unit tests for core functionality
-2. **Short-term**: Improve integration test coverage
-3. **Long-term**: Establish coverage monitoring and alerts
-        
-### 📊 Coverage Goals
-- **Next milestone**: 70% coverage
-- **Target**: 85% coverage
-- **Stretch goal**: 90% coverage
-EOF
+          cat >> coverage-trends/trend-analysis.md <<'EOF'
+                
+          ### 🎯 Priority Actions
+          1. **Immediate**: Add unit tests for core functionality
+          2. **Short-term**: Improve integration test coverage
+          3. **Long-term**: Establish coverage monitoring and alerts
+                
+          ### 📊 Coverage Goals
+          - **Next milestone**: 70% coverage
+          - **Target**: 85% coverage
+          - **Stretch goal**: 90% coverage
+          EOF
         else
-          cat >> coverage-trends/trend-analysis.md <<EOF
-        
-### ✅ Maintenance Actions
-1. **Monitor**: Keep coverage above 85%
-2. **Improve**: Target 90%+ coverage for critical paths
-3. **Maintain**: Regular coverage reviews
-EOF
+          cat >> coverage-trends/trend-analysis.md <<'EOF'
+                
+          ### ✅ Maintenance Actions
+          1. **Monitor**: Keep coverage above 85%
+          2. **Improve**: Target 90%+ coverage for critical paths
+          3. **Maintain**: Regular coverage reviews
+          EOF
         fi
         
         echo "✅ Coverage trend analysis completed"

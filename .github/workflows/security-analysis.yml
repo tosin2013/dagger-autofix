@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: '1.19'
+  GO_VERSION: '1.21'
   GOSEC_VERSION: '2.18.2'
   CACHE_VERSION: v1
 
@@ -39,7 +39,7 @@ jobs:
         cache: true
     
     - name: Cache Go modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cache/go-build
@@ -97,18 +97,18 @@ jobs:
           
           # Create a basic summary (this would be enhanced with proper JSON parsing in production)
           cat > security-reports/vuln-summary.json << 'EOF'
-{
-  "vulnerabilities": [],
-  "summary": {
-    "total": 0,
-    "critical": 0,
-    "high": 0,
-    "medium": 0,
-    "low": 0
-  },
-  "scan_status": "completed_with_findings"
-}
-EOF
+          {
+            "vulnerabilities": [],
+            "summary": {
+              "total": 0,
+              "critical": 0,
+              "high": 0,
+              "medium": 0,
+              "low": 0
+            },
+            "scan_status": "completed_with_findings"
+          }
+          EOF
         fi
         
         # Generate human-readable vulnerability report
@@ -122,27 +122,27 @@ EOF
         
         # Create consolidated security summary
         cat > security-reports/security-summary.json << 'EOF'
-{
-  "scan_timestamp": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
-  "repository": "${{ github.repository }}",
-  "commit": "${{ github.sha }}",
-  "branch": "${{ github.ref_name }}",
-  "tools": {
-    "gosec": {
-      "version": "'${{ env.GOSEC_VERSION }}'",
-      "report_file": "gosec-report.sarif"
-    },
-    "govulncheck": {
-      "report_file": "govulncheck-report.json"
-    }
-  },
-  "summary": {
-    "static_analysis_issues": 0,
-    "vulnerabilities": 0,
-    "scan_status": "completed"
-  }
-}
-EOF
+        {
+          "scan_timestamp": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
+          "repository": "${{ github.repository }}",
+          "commit": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "tools": {
+            "gosec": {
+              "version": "'${{ env.GOSEC_VERSION }}'",
+              "report_file": "gosec-report.sarif"
+            },
+            "govulncheck": {
+              "report_file": "govulncheck-report.json"
+            }
+          },
+          "summary": {
+            "static_analysis_issues": 0,
+            "vulnerabilities": 0,
+            "scan_status": "completed"
+          }
+        }
+        EOF
         
         # Count issues from gosec SARIF report if it exists and is valid
         if [ -f "security-reports/gosec-report.sarif" ]; then
@@ -157,7 +157,7 @@ EOF
     
     - name: Upload SARIF to GitHub Security
       if: always()
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: security-reports/gosec-report.sarif
         category: gosec
@@ -228,15 +228,15 @@ EOF
         
         # Create badge endpoint data
         cat > security-reports/security-badge.json << EOF
-{
-  "schemaVersion": 1,
-  "label": "security",
-  "message": "$SECURITY_STATUS",
-  "color": "$SECURITY_COLOR",
-  "namedLogo": "security",
-  "logoColor": "white"
-}
-EOF
+        {
+          "schemaVersion": 1,
+          "label": "security",
+          "message": "$SECURITY_STATUS",
+          "color": "$SECURITY_COLOR",
+          "namedLogo": "security",
+          "logoColor": "white"
+        }
+        EOF
         
         echo "Security badge data generated: $SECURITY_STATUS"
 
