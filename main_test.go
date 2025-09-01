@@ -129,7 +129,7 @@ func TestLLMClient(t *testing.T) {
 // TestTestEngine tests the testing and validation functionality
 func TestTestEngine(t *testing.T) {
 	t.Run("NewTestEngine", func(t *testing.T) {
-		engine := NewTestEngine(85, nil)
+		engine := NewTestEngine(85, logrus.New())
 		assert.NotNil(t, engine)
 		assert.Equal(t, 85, engine.minCoverage)
 		assert.NotNil(t, engine.testFrameworks)
@@ -149,7 +149,7 @@ func TestTestEngine(t *testing.T) {
 			{"unknown.txt", "generic"},
 		}
 
-		engine := NewTestEngine(85, nil)
+		engine := NewTestEngine(85, logrus.New())
 		for _, tc := range testCases {
 			framework := engine.getFrameworkByFile(tc.filename)
 			assert.Equal(t, tc.expected, framework.Name)
@@ -157,7 +157,7 @@ func TestTestEngine(t *testing.T) {
 	})
 
 	t.Run("CoverageValidation", func(t *testing.T) {
-		engine := NewTestEngine(80, nil)
+		engine := NewTestEngine(80, logrus.New())
 
 		// Coverage above threshold
 		coverageResult := &CoverageResult{Coverage: 85.0}
@@ -175,7 +175,7 @@ func TestTestEngine(t *testing.T) {
 // TestPullRequestEngine tests PR creation functionality
 func TestPullRequestEngine(t *testing.T) {
 	t.Run("GeneratePRTitle", func(t *testing.T) {
-		engine := NewPullRequestEngine(nil, nil)
+		engine := NewPullRequestEngine(nil, logrus.New())
 		analysis := &FailureAnalysisResult{
 			Classification: FailureClassification{
 				Type: BuildFailure,
@@ -196,7 +196,7 @@ func TestPullRequestEngine(t *testing.T) {
 	})
 
 	t.Run("GeneratePRLabels", func(t *testing.T) {
-		engine := NewPullRequestEngine(nil, nil)
+		engine := NewPullRequestEngine(nil, logrus.New())
 		analysis := &FailureAnalysisResult{
 			Classification: FailureClassification{
 				Type:     TestFailure,
@@ -217,7 +217,7 @@ func TestPullRequestEngine(t *testing.T) {
 	})
 
 	t.Run("GenerateBranchName", func(t *testing.T) {
-		engine := NewPullRequestEngine(nil, nil)
+		engine := NewPullRequestEngine(nil, logrus.New())
 		analysis := &FailureAnalysisResult{ID: "analysis-123"}
 		fix := &ProposedFix{Type: DependencyFix}
 
@@ -410,7 +410,7 @@ func TestIntegration(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkFailureAnalysis(b *testing.B) {
-	engine := NewFailureAnalysisEngine(nil, nil)
+	engine := NewFailureAnalysisEngine(nil, logrus.New())
 	context := FailureContext{
 		Logs: &WorkflowLogs{
 			ErrorLines: []string{"npm install failed", "build error"},
@@ -425,7 +425,7 @@ func BenchmarkFailureAnalysis(b *testing.B) {
 }
 
 func BenchmarkPromptGeneration(b *testing.B) {
-	engine := NewFailureAnalysisEngine(nil, nil)
+	engine := NewFailureAnalysisEngine(nil, logrus.New())
 	context := FailureContext{
 		WorkflowRun: &WorkflowRun{
 			ID:     12345,
