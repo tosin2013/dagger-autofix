@@ -398,11 +398,11 @@ func TestConfigurationValidation(t *testing.T) {
 				module := New().WithRepository(tc.repoOwner, tc.repoName)
 				
 				if tc.hasGitHubToken {
-					module = module.WithGitHubToken(dag.SetSecret("github-token", "mock-token"))
+					module = module.WithGitHubToken(createTestSecret("github-token", "mock-token"))
 				}
 				
 				if tc.hasLLMKey {
-					module = module.WithLLMProvider("openai", dag.SetSecret("llm-key", "mock-key"))
+					module = module.WithLLMProvider("openai", createTestSecret("llm-key", "mock-key"))
 				}
 				
 				err := module.validateConfiguration()

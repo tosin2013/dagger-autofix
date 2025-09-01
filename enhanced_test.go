@@ -47,7 +47,8 @@ func TestEnhancedIntegration(t *testing.T) {
 				defer wg.Done()
 				// Test concurrent module creation and configuration
 				testModule := New().
-					WithGitHubToken(dag.SetSecret("test-token", fmt.Sprintf("token-%d", index))).
+					WithGitHubToken(createTestSecret("test-token", fmt.Sprintf("token-%d", index))).
+					WithLLMProvider("openai", createTestSecret("test-key", fmt.Sprintf("key-%d", index))).
 					WithRepository("test-owner", "test-repo")
 				
 				results[index] = testModule.validateConfiguration()
@@ -153,7 +154,7 @@ func TestErrorScenarios(t *testing.T) {
 				setupFunc: func() *DaggerAutofix {
 					return New().
 						WithRepository("owner", "repo").
-						WithLLMProvider("openai", dag.SetSecret("key", "test"))
+						WithLLMProvider("openai", createTestSecret("key", "test"))
 				},
 				expectError: true,
 				errorContains: "GitHub token",
@@ -162,7 +163,7 @@ func TestErrorScenarios(t *testing.T) {
 				name: "MissingLLMKey", 
 				setupFunc: func() *DaggerAutofix {
 					return New().
-						WithGitHubToken(dag.SetSecret("token", "test")).
+						WithGitHubToken(createTestSecret("token", "test")).
 						WithRepository("owner", "repo")
 				},
 				expectError: true,
@@ -172,8 +173,8 @@ func TestErrorScenarios(t *testing.T) {
 				name: "MissingRepository",
 				setupFunc: func() *DaggerAutofix {
 					return New().
-						WithGitHubToken(dag.SetSecret("token", "test")).
-						WithLLMProvider("openai", dag.SetSecret("key", "test"))
+						WithGitHubToken(createTestSecret("token", "test")).
+						WithLLMProvider("openai", createTestSecret("key", "test"))
 				},
 				expectError: true,
 				errorContains: "repository",
@@ -205,7 +206,7 @@ func TestErrorScenarios(t *testing.T) {
 		
 		for i := 0; i < numModules; i++ {
 			module := New().
-				WithGitHubToken(dag.SetSecret("token", fmt.Sprintf("token-%d", i))).
+				WithGitHubToken(createTestSecret("token", fmt.Sprintf("token-%d", i))).
 				WithRepository("owner", "repo")
 			modules = append(modules, module)
 		}
@@ -241,8 +242,8 @@ func TestPerformanceBenchmarks(t *testing.T) {
 		
 		for i := 0; i < iterations; i++ {
 			_ = New().
-				WithGitHubToken(dag.SetSecret("token", fmt.Sprintf("token-%d", i))).
-				WithLLMProvider("openai", dag.SetSecret("key", fmt.Sprintf("key-%d", i))).
+				WithGitHubToken(createTestSecret("token", fmt.Sprintf("token-%d", i))).
+				WithLLMProvider("openai", createTestSecret("key", fmt.Sprintf("key-%d", i))).
 				WithRepository("owner", "repo").
 				WithMinCoverage(85)
 		}
@@ -394,8 +395,8 @@ func TestFrameworkCompatibility(t *testing.T) {
 
 func setupTestModule(t *testing.T) *DaggerAutofix {
 	return New().
-		WithGitHubToken(dag.SetSecret("test-token", "fake-token-for-testing")).
-		WithLLMProvider("openai", dag.SetSecret("test-key", "fake-key-for-testing")).
+		WithGitHubToken(createTestSecret("test-token", "fake-token-for-testing")).
+		WithLLMProvider("openai", createTestSecret("test-key", "fake-key-for-testing")).
 		WithRepository("test-owner", "test-repo")
 }
 
