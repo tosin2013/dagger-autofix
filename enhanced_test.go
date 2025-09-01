@@ -93,7 +93,9 @@ func TestErrorScenarios(t *testing.T) {
 		// This should handle timeout gracefully
 		_, err := module.GetMetrics(context.Background())
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "context")
+		if err != nil {
+			assert.Contains(t, err.Error(), "context")
+		}
 	})
 
 	t.Run("InvalidInputs", func(t *testing.T) {
