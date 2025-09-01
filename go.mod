@@ -2,8 +2,6 @@ module github.com/tosin2013/dagger-autofix
 
 go 1.21
 
-toolchain go1.24.3
-
 require (
 	dagger.io/dagger v0.11.0
 	github.com/google/go-github/v45 v45.2.0
