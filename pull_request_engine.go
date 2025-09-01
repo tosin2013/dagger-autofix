@@ -146,7 +146,7 @@ func (p *PullRequestEngine) UpdatePR(ctx context.Context, prNumber int, updates 
 		Branch:    existingPR.GetHead().GetRef(),
 		CommitSHA: result.GetHead().GetSHA(),
 		State:     result.GetState(),
-		CreatedAt: result.GetCreatedAt().Time,
+		CreatedAt: result.GetCreatedAt(),
 		Author:    result.GetUser().GetLogin(),
 		Labels:    updates.Labels,
 	}, nil
@@ -208,7 +208,7 @@ func (p *PullRequestEngine) GetPRStatus(ctx context.Context, prNumber int) (*Pul
 		Branch:    pr.GetHead().GetRef(),
 		CommitSHA: pr.GetHead().GetSHA(),
 		State:     pr.GetState(),
-		CreatedAt: pr.GetCreatedAt().Time,
+		CreatedAt: pr.GetCreatedAt(),
 		Author:    pr.GetUser().GetLogin(),
 		Labels:    labelNames,
 	}, nil
@@ -503,7 +503,7 @@ func (p *PullRequestEngine) createPullRequest(ctx context.Context, options *PRCr
 		Branch:    options.BranchName,
 		CommitSHA: pr.GetHead().GetSHA(),
 		State:     pr.GetState(),
-		CreatedAt: pr.GetCreatedAt().Time,
+		CreatedAt: pr.GetCreatedAt(),
 		Author:    pr.GetUser().GetLogin(),
 		Labels:    options.Labels,
 	}, nil

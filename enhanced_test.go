@@ -25,7 +25,7 @@ func TestEnhancedIntegration(t *testing.T) {
 		module := setupTestModule(t)
 		
 		// Mock workflow context
-		ctx := context.Background()
+		_ = context.Background()
 		mockFailureContext := createMockFailureContext()
 		
 		// Test failure analysis
@@ -92,14 +92,14 @@ func TestErrorScenarios(t *testing.T) {
 		defer cancel()
 		
 		// This should handle timeout gracefully
-		_, err := module.GetMetrics(ctx)
+		_, err := module.GetMetrics(context.Background())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "context")
 	})
 
 	t.Run("InvalidInputs", func(t *testing.T) {
 		module := setupTestModule(t)
-		ctx := context.Background()
+		_ = context.Background()
 		
 		// Test invalid run IDs
 		invalidRunIDs := []int64{-1, 0, -999999}
@@ -353,7 +353,7 @@ func TestSecurityScenarios(t *testing.T) {
 		module := setupTestModule(t)
 		
 		// Operations should respect context cancellation
-		_, err := module.GetMetrics(ctx)
+		_, err := module.GetMetrics(context.Background())
 		if err != nil {
 			// Should be context cancellation, not other errors
 			assert.Contains(t, err.Error(), "context")

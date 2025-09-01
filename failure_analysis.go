@@ -487,7 +487,7 @@ func (e *FailureAnalysisEngine) addValidationSteps(fix *ProposedFix, analysis *F
 			Expected: "Dependencies resolved",
 			Timeout:  2 * time.Minute,
 		})
-	case SecurityFailure:
+	case SecurityFix:
 		validationSteps = append(validationSteps, ValidationStep{
 			Name:     "Security Scan",
 			Command:  "make security-scan",

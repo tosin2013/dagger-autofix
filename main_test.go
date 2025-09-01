@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestGithubAutofix tests the main module functionality
-func TestGithubAutofix(t *testing.T) {
-	t.Run("NewGithubAutofix", func(t *testing.T) {
+// TestDaggerAutofix tests the main module functionality
+func TestDaggerAutofix(t *testing.T) {
+	t.Run("NewDaggerAutofix", func(t *testing.T) {
 		module := New()
 		assert.NotNil(t, module)
 		assert.Equal(t, "openai", module.LLMProvider)
@@ -265,7 +265,7 @@ func TestPromptTemplates(t *testing.T) {
 // TestConfigValidation tests configuration validation
 func TestConfigValidation(t *testing.T) {
 	t.Run("ValidConfiguration", func(t *testing.T) {
-		module := &GithubAutofix{
+		module := &DaggerAutofix{
 			GitHubToken: dag.SetSecret("github-token", "valid-token"),
 			LLMAPIKey:   dag.SetSecret("llm-key", "valid-key"),
 			RepoOwner:   "test-owner",
@@ -277,7 +277,7 @@ func TestConfigValidation(t *testing.T) {
 	})
 
 	t.Run("MissingGitHubToken", func(t *testing.T) {
-		module := &GithubAutofix{
+		module := &DaggerAutofix{
 			LLMAPIKey: dag.SetSecret("llm-key", "valid-key"),
 			RepoOwner: "test-owner",
 			RepoName:  "test-repo",
@@ -289,7 +289,7 @@ func TestConfigValidation(t *testing.T) {
 	})
 
 	t.Run("MissingLLMKey", func(t *testing.T) {
-		module := &GithubAutofix{
+		module := &DaggerAutofix{
 			GitHubToken: dag.SetSecret("github-token", "valid-token"),
 			RepoOwner:   "test-owner",
 			RepoName:    "test-repo",
@@ -301,7 +301,7 @@ func TestConfigValidation(t *testing.T) {
 	})
 
 	t.Run("MissingRepository", func(t *testing.T) {
-		module := &GithubAutofix{
+		module := &DaggerAutofix{
 			GitHubToken: dag.SetSecret("github-token", "valid-token"),
 			LLMAPIKey:   dag.SetSecret("llm-key", "valid-key"),
 		}

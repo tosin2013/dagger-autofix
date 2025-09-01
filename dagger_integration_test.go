@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"dagger.io/dagger"
+	_ "dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestDaggerIntegration tests Dagger-specific functionality
 func TestDaggerIntegration(t *testing.T) {
-	ctx := context.Background()
+	_ = context.Background()
 
 	t.Run("ModuleInitialization", func(t *testing.T) {
 		// This test requires valid credentials, so skip if not available
@@ -108,7 +108,7 @@ func TestRealWorldScenarios(t *testing.T) {
 	t.Skip("Real-world scenario tests require actual credentials")
 
 	t.Run("EndToEndWorkflow", func(t *testing.T) {
-		ctx := context.Background()
+		_ = context.Background()
 		
 		// This would test a complete workflow:
 		// 1. Initialize agent with real credentials
@@ -123,16 +123,16 @@ func TestRealWorldScenarios(t *testing.T) {
 			WithLLMProvider("openai", dag.SetSecret("openai-key", "real-key")).
 			WithRepository("test-org", "test-repo")
 
-		initializedAgent, err := agent.Initialize(ctx)
+		initializedAgent, err := agent.Initialize(context.Background())
 		require.NoError(t, err)
 
 		// Analyze a failure
-		analysis, err := initializedAgent.AnalyzeFailure(ctx, 12345)
+		analysis, err := initializedAgent.AnalyzeFailure(context.Background(), 12345)
 		require.NoError(t, err)
 		assert.NotNil(t, analysis)
 
 		// Generate and apply fix
-		result, err := initializedAgent.AutoFix(ctx, 12345)
+		result, err := initializedAgent.AutoFix(context.Background(), 12345)
 		require.NoError(t, err)
 		assert.True(t, result.Success)
 	})
@@ -146,7 +146,7 @@ func TestRealWorldScenarios(t *testing.T) {
 			WithLLMProvider("openai", dag.SetSecret("openai-key", "real-key")).
 			WithRepository("test-org", "test-repo")
 
-		initializedAgent, err := agent.Initialize(ctx)
+		initializedAgent, err := agent.Initialize(context.Background())
 		require.NoError(t, err)
 
 		// Start monitoring (this would run indefinitely in real usage)
@@ -197,14 +197,14 @@ func TestErrorHandling(t *testing.T) {
 	})
 
 	t.Run("InvalidRunID", func(t *testing.T) {
-		ctx := context.Background()
+		_ = context.Background()
 		module := New().
 			WithGitHubToken(dag.SetSecret("token", "fake-token")).
 			WithLLMProvider("openai", dag.SetSecret("key", "fake-key")).
 			WithRepository("owner", "repo")
 
 		// This would fail because we can't initialize with fake credentials
-		_, err := module.Initialize(ctx)
+		_, err := module.Initialize(context.Background())
 		assert.Error(t, err)
 	})
 }
@@ -213,7 +213,7 @@ func TestErrorHandling(t *testing.T) {
 func TestConcurrency(t *testing.T) {
 	t.Run("ConcurrentModuleCreation", func(t *testing.T) {
 		const numGoroutines = 10
-		results := make(chan *GithubAutofix, numGoroutines)
+		results := make(chan *DaggerAutofix, numGoroutines)
 		
 		for i := 0; i < numGoroutines; i++ {
 			go func() {
@@ -238,7 +238,7 @@ func TestConcurrency(t *testing.T) {
 func TestMemoryUsage(t *testing.T) {
 	t.Run("ModuleMemoryFootprint", func(t *testing.T) {
 		// Create many modules to test memory usage
-		modules := make([]*GithubAutofix, 1000)
+		modules := make([]*DaggerAutofix, 1000)
 		for i := range modules {
 			modules[i] = New()
 		}

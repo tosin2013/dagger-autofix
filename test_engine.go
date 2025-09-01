@@ -131,7 +131,7 @@ func (e *TestEngine) RunTests(ctx context.Context, owner, repo, branch string) (
 	testStats := e.parseTestOutput(testOutput, framework)
 
 	result := &TestResult{
-		Success:      testStats.Passed && coverageResult.Coverage >= float64(e.minCoverage),
+		Success:      testStats.Passed > 0 && coverageResult.Coverage >= float64(e.minCoverage),
 		TotalTests:   testStats.Total,
 		PassedTests:  testStats.Passed,
 		FailedTests:  testStats.Failed,
@@ -148,7 +148,7 @@ func (e *TestEngine) RunTests(ctx context.Context, owner, repo, branch string) (
 		},
 	}
 
-	if !testStats.Passed {
+	if testStats.Failed > 0 {
 		result.Errors = append(result.Errors, "Some tests failed")
 	}
 

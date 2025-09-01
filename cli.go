@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 
-	"dagger.io/dagger"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/sirupsen/logrus"
@@ -16,7 +15,7 @@ import (
 type CLI struct {
 	logger *logrus.Logger
 	rootCmd *cobra.Command
-	agent  *GithubAutofix
+	agent  *DaggerAutofix
 }
 
 // CLIConfig holds CLI configuration
@@ -412,7 +411,7 @@ func (c *CLI) loadConfiguration() {
 	}
 }
 
-func (c *CLI) initializeAgent(ctx context.Context) (*GithubAutofix, error) {
+func (c *CLI) initializeAgent(ctx context.Context) (*DaggerAutofix, error) {
 	config := c.getCurrentConfig(c.rootCmd)
 
 	// Validate required configuration

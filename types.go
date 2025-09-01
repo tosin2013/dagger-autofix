@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -160,6 +159,7 @@ const (
 	InfrastructureFix FixType = "infrastructure"
 	WorkflowFix       FixType = "workflow"
 	TestFix           FixType = "test"
+	SecurityFix       FixType = "security"
 )
 
 // CodeChange represents a change to source code
@@ -312,7 +312,7 @@ func (g *GitHubIntegration) GetWorkflowLogs(ctx context.Context, runID int64) (*
 
 	for _, job := range jobs.Jobs {
 		// Get job logs
-		logURL, _, err := g.client.Actions.GetWorkflowJobLogs(ctx, g.repoOwner, g.repoName, job.GetID(), 2)
+		logURL, _, err := g.client.Actions.GetWorkflowJobLogs(ctx, g.repoOwner, g.repoName, job.GetID(), true)
 		if err != nil {
 			g.logger.WithError(err).Warnf("Failed to get logs for job %s", job.GetName())
 			continue
@@ -340,14 +340,13 @@ func (g *GitHubIntegration) GetWorkflowLogs(ctx context.Context, runID int64) (*
 // GetFailedWorkflowRuns retrieves recent failed workflow runs
 func (g *GitHubIntegration) GetFailedWorkflowRuns(ctx context.Context) ([]*WorkflowRun, error) {
 	opts := &github.ListWorkflowRunsOptions{
-		Status:     "completed",
-		Conclusion: "failure",
+		Status: "completed",
 		ListOptions: github.ListOptions{
 			PerPage: 10,
 		},
 	}
 
-	runs, _, err := g.client.Actions.ListWorkflowRunsForRepo(ctx, g.repoOwner, g.repoName, opts)
+	runs, _, err := g.client.Actions.ListRepositoryWorkflowRuns(ctx, g.repoOwner, g.repoName, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list workflow runs: %w", err)
 	}

@@ -12,6 +12,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// initDagger initializes the global Dagger client
+// Note: dag is already declared in dag.go as a daggerClient interface
+func initDagger(ctx context.Context) error {
+	// In a real Dagger environment, dag is provided by the runtime
+	// For standalone execution, we can optionally connect to a real client
+	// but the mock in dag.go is sufficient for compilation
+	return nil
+}
+
 // DaggerAutofix represents the main Dagger module for GitHub Actions auto-fixing
 type DaggerAutofix struct {
 	// Source directory for the project
@@ -19,7 +28,7 @@ type DaggerAutofix struct {
 	
 	// Configuration
 	GitHubToken    *dagger.Secret
-	LLMProvider    string
+	LLMProvider    LLMProvider
 	LLMAPIKey      *dagger.Secret
 	RepoOwner      string
 	RepoName       string
@@ -52,7 +61,7 @@ func New(source ...*dagger.Directory) *DaggerAutofix {
 
 	return &DaggerAutofix{
 		Source:        sourceDir,
-		LLMProvider:   "openai", // default provider
+		LLMProvider:   OpenAI, // default provider
 		TargetBranch:  "main",
 		MinCoverage:   85,
 		logger:        logger,
@@ -73,7 +82,7 @@ func (m *DaggerAutofix) WithGitHubToken(token *dagger.Secret) *DaggerAutofix {
 
 // WithLLMProvider configures the LLM provider and API key
 func (m *DaggerAutofix) WithLLMProvider(provider string, apiKey *dagger.Secret) *DaggerAutofix {
-	m.LLMProvider = strings.ToLower(provider)
+	m.LLMProvider = LLMProvider(strings.ToLower(provider))
 	m.LLMAPIKey = apiKey
 	return m
 }
