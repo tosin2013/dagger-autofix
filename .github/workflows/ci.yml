@@ -76,7 +76,8 @@ jobs:
         echo "Current coverage: ${coverage}%"
         echo "Required threshold: ${{ env.COVERAGE_THRESHOLD }}%"
         
-        if (( $(echo "$coverage >= ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+        # Use awk for floating point comparison (more portable than bc)
+        if awk "BEGIN {exit !($coverage >= ${{ env.COVERAGE_THRESHOLD }})}"; then
           echo "✅ Coverage threshold met: ${coverage}% >= ${{ env.COVERAGE_THRESHOLD }}%"
         else
           echo "❌ Coverage below threshold: ${coverage}% < ${{ env.COVERAGE_THRESHOLD }}%"
