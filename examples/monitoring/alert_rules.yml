@@ -1,0 +1,74 @@
+# Prometheus alert rules for GitHub Actions Auto-Fix Agent
+
+groups:
+  - name: github-autofix-alerts
+    rules:
+      # High failure rate
+      - alert: HighFailureRate
+        expr: rate(github_autofix_failures_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High failure rate detected"
+          description: "Auto-fix failure rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+          
+      # Analysis taking too long
+      - alert: SlowAnalysis
+        expr: histogram_quantile(0.95, rate(github_autofix_analysis_duration_seconds_bucket[5m])) > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Analysis performance degraded"
+          description: "95th percentile analysis time is {{ $value }} seconds"
+          
+      # Memory usage high
+      - alert: HighMemoryUsage
+        expr: github_autofix_memory_usage_bytes / github_autofix_memory_limit_bytes > 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} of limit"
+          
+      # API rate limit approaching
+      - alert: APIRateLimitHigh
+        expr: github_autofix_api_rate_limit_remaining / github_autofix_api_rate_limit_total < 0.2
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API rate limit running low"
+          description: "Only {{ $value | humanizePercentage }} of API rate limit remaining"
+          
+      # LLM provider errors
+      - alert: LLMProviderErrors
+        expr: rate(github_autofix_llm_errors_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM provider experiencing errors"
+          description: "LLM error rate is {{ $value | humanizePercentage }}"
+          
+      # Service is down
+      - alert: ServiceDown
+        expr: up{job="github-autofix"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GitHub Auto-Fix service is down"
+          description: "Service has been down for more than 1 minute"
+          
+      # Cache hit rate low
+      - alert: LowCacheHitRate
+        expr: rate(github_autofix_cache_hits_total[10m]) / rate(github_autofix_cache_requests_total[10m]) < 0.5
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}"

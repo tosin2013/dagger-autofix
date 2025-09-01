@@ -1,0 +1,52 @@
+# Prometheus configuration for GitHub Actions Auto-Fix Agent monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # GitHub Auto-Fix Agent metrics
+  - job_name: 'github-autofix'
+    static_configs:
+      - targets: ['github-autofix:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    
+  # LiteLLM proxy metrics (if available)
+  - job_name: 'litellm'
+    static_configs:
+      - targets: ['litellm:4000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    
+  # System metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+      
+  # Docker metrics (if available)
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['docker-exporter:9104']
+      
+# Remote write for long-term storage (optional)
+# remote_write:
+#   - url: "https://prometheus-remote-write-endpoint/api/v1/write"
+#     basic_auth:
+#       username: "username"
+#       password: "password"

@@ -1,0 +1,191 @@
+🔍 Analyzing Workflow Run: 17385176718
+Repository: tosin2013/dagger-autofix
+==================================
+
+📋 Workflow Details:
+--------------------
+
+X main Continuous Integration · 17385176718
+Triggered via push about 9 minutes ago
+
+JOBS
+X Build and Test in 1m4s (ID 49350298484)
+  ✓ Set up job
+  ✓ Checkout code
+  ✓ Set up Go
+  ✓ Cache Go modules
+  ✓ Download dependencies
+  X Run linting
+  - Build application
+  - Run tests with coverage
+  - Check coverage threshold
+  - Upload coverage to Codecov
+  ✓ Upload test results
+  ✓ Post Run linting
+  - Post Cache Go modules
+  - Post Set up Go
+  ✓ Post Checkout code
+  ✓ Complete job
+X Quality Gates in 4s (ID 49350339754)
+  ✓ Set up job
+  X Check all jobs status
+  ✓ Complete job
+- Integration Tests in 0s (ID 49350339809)
+
+ANNOTATIONS
+! Failed to save: <h2>Our services aren't available right now</h2><p>We're working to restore all services as soon as possible. Please check back soon.</p>0K+q1aAAAAAAYm9b23+KoRqgXR1p2O0PbQ0hJMzBFREdFMDIxNgBFZGdl
+Build and Test: .github#3
+
+! No files were found with the provided path: coverage.out. No artifacts will be uploaded.
+Build and Test: .github#15
+
+X undefined: dag
+Build and Test: main.go#308
+
+X cannot use m.LLMProvider (variable of type string) as LLMProvider value in argument to NewLLMClient
+Build and Test: main.go#114
+
+X undefined: dag
+Build and Test: main.go#50
+
+X invalid case SecurityFailure in switch on fix.Type (mismatched types FailureType and FixType)
+Build and Test: failure_analysis.go#490
+
+X undefined: dag
+Build and Test: cli.go#432
+
+X undefined: dag
+Build and Test: cli.go#431
+
+X undefined: GithubAutofix
+Build and Test: cli.go#415
+
+X undefined: dag
+Build and Test: cli.go#355
+
+X undefined: GithubAutofix
+Build and Test: cli.go#19
+
+X : # github.com/tosin2013/dagger-autofix [github.com/tosin2013/dagger-autofix.test]
+Build and Test: cli.go#1
+
+! Failed to restore: Cache service responded with 400
+Build and Test: .github#17
+
+X Process completed with exit code 1.
+Quality Gates: .github#21
+
+
+To see what failed, try: gh run view 17385176718 --log-failed
+View this run on GitHub: https://github.com/tosin2013/dagger-autofix/actions/runs/17385176718
+
+🔧 Job Status:
+--------------
+Build and Test                 completed (failure)
+Quality Gates                  completed (failure)
+Integration Tests              completed (skipped)
+
+📝 Getting logs for failed jobs...
+-----------------------------------
+Build and Test	Set up job	﻿2025-09-01T18:46:06.2830142Z Current runner version: '2.328.0'
+Build and Test	Set up job	2025-09-01T18:46:06.2906065Z ##[group]Runner Image Provisioner
+Build and Test	Set up job	2025-09-01T18:46:06.2907522Z Hosted Compute Agent
+Build and Test	Set up job	2025-09-01T18:46:06.2908399Z Version: 20250821.380
+Build and Test	Set up job	2025-09-01T18:46:06.2909641Z Commit: 438d12cb4fe092871db9867344e3bc0bc5319035
+Build and Test	Set up job	2025-09-01T18:46:06.2910838Z Build Date: 2025-08-21T20:49:43Z
+Build and Test	Set up job	2025-09-01T18:46:06.2911850Z ##[endgroup]
+Build and Test	Set up job	2025-09-01T18:46:06.2912698Z ##[group]Operating System
+Build and Test	Set up job	2025-09-01T18:46:06.2913726Z Ubuntu
+Build and Test	Set up job	2025-09-01T18:46:06.2914532Z 24.04.3
+Build and Test	Set up job	2025-09-01T18:46:06.2915340Z LTS
+Build and Test	Set up job	2025-09-01T18:46:06.2916097Z ##[endgroup]
+Build and Test	Set up job	2025-09-01T18:46:06.2917117Z ##[group]Runner Image
+Build and Test	Set up job	2025-09-01T18:46:06.2918087Z Image: ubuntu-24.04
+Build and Test	Set up job	2025-09-01T18:46:06.2918872Z Version: 20250824.1.0
+Build and Test	Set up job	2025-09-01T18:46:06.2924904Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250824.1/images/ubuntu/Ubuntu2404-Readme.md
+Build and Test	Set up job	2025-09-01T18:46:06.2927458Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250824.1
+Build and Test	Set up job	2025-09-01T18:46:06.2929877Z ##[endgroup]
+Build and Test	Set up job	2025-09-01T18:46:06.2932186Z ##[group]GITHUB_TOKEN Permissions
+Build and Test	Set up job	2025-09-01T18:46:06.2934843Z Actions: read
+Build and Test	Set up job	2025-09-01T18:46:06.2935731Z Checks: write
+Build and Test	Set up job	2025-09-01T18:46:06.2936505Z Contents: read
+Build and Test	Set up job	2025-09-01T18:46:06.2937451Z Metadata: read
+Build and Test	Set up job	2025-09-01T18:46:06.2938317Z SecurityEvents: write
+Build and Test	Set up job	2025-09-01T18:46:06.2939626Z ##[endgroup]
+Build and Test	Set up job	2025-09-01T18:46:06.2943075Z Secret source: Actions
+Build and Test	Set up job	2025-09-01T18:46:06.2944542Z Prepare workflow directory
+Build and Test	Set up job	2025-09-01T18:46:06.3906952Z Prepare all required actions
+Build and Test	Set up job	2025-09-01T18:46:06.4023196Z Getting action download info
+Build and Test	Set up job	2025-09-01T18:46:06.7849000Z Download action repository 'actions/checkout@v4' (SHA:08eba0b27e820071cde6df949e0beb9ba4906955)
+Build and Test	Set up job	2025-09-01T18:46:06.8653073Z Download action repository 'actions/setup-go@v4' (SHA:19bb51245e9c80abacb2e91cc42b33fa478b8639)
+Build and Test	Set up job	2025-09-01T18:46:07.9728948Z Download action repository 'actions/cache@v4' (SHA:0400d5f644dc74513175e3cd8d07132dd4860809)
+Build and Test	Set up job	2025-09-01T18:46:08.1218037Z Download action repository 'golangci/golangci-lint-action@v3' (SHA:3a919529898de77ec3da873e3063ca4b10e7f5cc)
+Build and Test	Set up job	2025-09-01T18:46:08.4952393Z Download action repository 'codecov/codecov-action@v3' (SHA:ab904c41d6ece82784817410c45d8b8c02684457)
+Build and Test	Set up job	2025-09-01T18:46:08.8489842Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Build and Test	Set up job	2025-09-01T18:46:09.1793875Z Complete job name: Build and Test
+Build and Test	Checkout code	﻿2025-09-01T18:46:09.2454689Z ##[group]Run actions/checkout@v4
+Build and Test	Checkout code	2025-09-01T18:46:09.2455433Z with:
+Build and Test	Checkout code	2025-09-01T18:46:09.2455743Z   fetch-depth: 0
+Build and Test	Checkout code	2025-09-01T18:46:09.2456054Z   repository: tosin2013/dagger-autofix
+Build and Test	Checkout code	2025-09-01T18:46:09.2456545Z   token: ***
+Build and Test	Checkout code	2025-09-01T18:46:09.2456883Z   ssh-strict: true
+Build and Test	Checkout code	2025-09-01T18:46:09.2457120Z   ssh-user: git
+Build and Test	Checkout code	2025-09-01T18:46:09.2457440Z   persist-credentials: true
+Build and Test	Checkout code	2025-09-01T18:46:09.2457730Z   clean: true
+Build and Test	Checkout code	2025-09-01T18:46:09.2458025Z   sparse-checkout-cone-mode: true
+Build and Test	Checkout code	2025-09-01T18:46:09.2458397Z   fetch-tags: false
+Build and Test	Checkout code	2025-09-01T18:46:09.2458656Z   show-progress: true
+Build and Test	Checkout code	2025-09-01T18:46:09.2458988Z   lfs: false
+Build and Test	Checkout code	2025-09-01T18:46:09.2459372Z   submodules: false
+Build and Test	Checkout code	2025-09-01T18:46:09.2459741Z   set-safe-directory: true
+Build and Test	Checkout code	2025-09-01T18:46:09.2460285Z env:
+Build and Test	Checkout code	2025-09-01T18:46:09.2460549Z   GO_VERSION: 1.21
+Build and Test	Checkout code	2025-09-01T18:46:09.2460884Z   COVERAGE_THRESHOLD: 85
+Build and Test	Checkout code	2025-09-01T18:46:09.2461212Z ##[endgroup]
+Build and Test	Checkout code	2025-09-01T18:46:09.3945015Z Syncing repository: tosin2013/dagger-autofix
+Build and Test	Checkout code	2025-09-01T18:46:09.3946999Z ##[group]Getting Git version info
+Build and Test	Checkout code	2025-09-01T18:46:09.3948574Z Working directory is '/home/runner/work/dagger-autofix/dagger-autofix'
+Build and Test	Checkout code	2025-09-01T18:46:09.3950111Z [command]/usr/bin/git version
+Build and Test	Checkout code	2025-09-01T18:46:09.4070051Z git version 2.51.0
+Build and Test	Checkout code	2025-09-01T18:46:09.4093300Z ##[endgroup]
+Build and Test	Checkout code	2025-09-01T18:46:09.4116182Z Temporarily overriding HOME='/home/runner/work/_temp/bce5a7fb-22dc-4187-bcf0-69470d7fd7aa' before making global git config changes
+Build and Test	Checkout code	2025-09-01T18:46:09.4117871Z Adding repository directory to the temporary git global config as a safe directory
+Build and Test	Checkout code	2025-09-01T18:46:09.4153498Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/dagger-autofix/dagger-autofix
+Build and Test	Checkout code	2025-09-01T18:46:09.4197313Z Deleting the contents of '/home/runner/work/dagger-autofix/dagger-autofix'
+Build and Test	Checkout code	2025-09-01T18:46:09.4201938Z ##[group]Initializing the repository
+Build and Test	Checkout code	2025-09-01T18:46:09.4207256Z [command]/usr/bin/git init /home/runner/work/dagger-autofix/dagger-autofix
+Build and Test	Checkout code	2025-09-01T18:46:09.4281258Z hint: Using 'master' as the name for the initial branch. This default branch name
+Build and Test	Checkout code	2025-09-01T18:46:09.4282255Z hint: is subject to change. To configure the initial branch name to use in all
+Build and Test	Checkout code	2025-09-01T18:46:09.4283285Z hint: of your new repositories, which will suppress this warning, call:
+Build and Test	Checkout code	2025-09-01T18:46:09.4283965Z hint:
+Build and Test	Checkout code	2025-09-01T18:46:09.4284450Z hint: 	git config --global init.defaultBranch <name>
+Build and Test	Checkout code	2025-09-01T18:46:09.4285115Z hint:
+Build and Test	Checkout code	2025-09-01T18:46:09.4285704Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Build and Test	Checkout code	2025-09-01T18:46:09.4286743Z hint: 'development'. The just-created branch can be renamed via this command:
+Build and Test	Checkout code	2025-09-01T18:46:09.4287647Z hint:
+Build and Test	Checkout code	2025-09-01T18:46:09.4288059Z hint: 	git branch -m <name>
+Build and Test	Checkout code	2025-09-01T18:46:09.4288546Z hint:
+Build and Test	Checkout code	2025-09-01T18:46:09.4289448Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Build and Test	Checkout code	2025-09-01T18:46:09.4291027Z Initialized empty Git repository in /home/runner/work/dagger-autofix/dagger-autofix/.git/
+Build and Test	Checkout code	2025-09-01T18:46:09.4303508Z [command]/usr/bin/git remote add origin https://github.com/tosin2013/dagger-autofix
+Build and Test	Checkout code	2025-09-01T18:46:09.4344351Z ##[endgroup]
+Build and Test	Checkout code	2025-09-01T18:46:09.4348667Z ##[group]Disabling automatic garbage collection
+Build and Test	Checkout code	2025-09-01T18:46:09.4349803Z [command]/usr/bin/git config --local gc.auto 0
+Build and Test	Checkout code	2025-09-01T18:46:09.4381462Z ##[endgroup]
+Build and Test	Checkout code	2025-09-01T18:46:09.4382829Z ##[group]Setting up auth
+Build and Test	Checkout code	2025-09-01T18:46:09.4388328Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Build and Test	Checkout code	2025-09-01T18:46:09.4422818Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Build and Test	Checkout code	2025-09-01T18:46:09.4779709Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Build and Test	Checkout code	2025-09-01T18:46:09.4812647Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Build and Test	Checkout code	2025-09-01T18:46:09.5044922Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Build and Test	Checkout code	2025-09-01T18:46:09.5081451Z ##[endgroup]
+Build and Test	Checkout code	2025-09-01T18:46:09.5082812Z ##[group]Fetching the repository
+Build and Test	Checkout code	2025-09-01T18:46:09.5101723Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+Build and Test	Checkout code	2025-09-01T18:46:09.9188611Z From https://github.com/tosin2013/dagger-autofix
+Build and Test	Checkout code	2025-09-01T18:46:09.9194361Z  * [new branch]      main       -> origin/main
+Build and Test	Checkout code	2025-09-01T18:46:09.9208634Z [command]/usr/bin/git branch --list --remote origin/main
+Build and Test	Checkout code	2025-09-01T18:46:09.9232510Z   origin/main
+Build and Test	Checkout code	2025-09-01T18:46:09.9244510Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+Build and Test	Checkout code	2025-09-01T18:46:09.9265574Z 3cad8101509384f80cc4e7cd2e5d9c43279c2833
+
+🔗 Full details: https://github.com/tosin2013/dagger-autofix/actions/runs/17385176718

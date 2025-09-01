@@ -1,0 +1,106 @@
+version: 2
+updates:
+  # Go modules dependency updates
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "tosin2013"
+    assignees:
+      - "tosin2013"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "security"
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      # Ignore patch updates for stable dependencies
+      - dependency-name: "golang.org/x/*"
+        update-types: ["version-update:semver-patch"]
+      # Allow security updates for all dependencies
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
+        # This is overridden by security updates
+    groups:
+      # Group Go standard library extensions
+      golang-std:
+        patterns:
+          - "golang.org/x/*"
+      # Group testing dependencies
+      testing:
+        patterns:
+          - "github.com/stretchr/testify"
+          - "*test*"
+      # Group Dagger dependencies
+      dagger:
+        patterns:
+          - "dagger.io/*"
+      # Group GitHub API dependencies
+      github-api:
+        patterns:
+          - "github.com/google/go-github/*"
+          - "golang.org/x/oauth2"
+      # Group logging dependencies
+      logging:
+        patterns:
+          - "github.com/sirupsen/logrus"
+          - "*log*"
+
+  # GitHub Actions workflow dependency updates
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "10:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "tosin2013"
+    assignees:
+      - "tosin2013"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "ci-cd"
+    groups:
+      # Group setup actions
+      setup-actions:
+        patterns:
+          - "actions/setup-*"
+          - "actions/checkout"
+          - "actions/cache"
+      # Group upload/download actions
+      artifact-actions:
+        patterns:
+          - "actions/upload-*"
+          - "actions/download-*"
+
+  # Docker dependency updates (if Dockerfile exists)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "tosin2013"
+    assignees:
+      - "tosin2013"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "docker"
+      - "security"

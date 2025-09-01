@@ -1,0 +1,9 @@
+{
+  "coverage": 0,
+  "date": "2024-01-01T00:00:00Z",
+  "commit": "initial",
+  "branch": "main",
+  "threshold": 85,
+  "updated_by": "initial-setup",
+  "note": "Initial baseline - will be updated by first successful coverage run"
+}

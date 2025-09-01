@@ -45,8 +45,8 @@ func New(source ...*dagger.Directory) *DaggerAutofix {
 	var sourceDir *dagger.Directory
 	if len(source) > 0 && source[0] != nil {
 		sourceDir = source[0]
-	} else {
-		// Use host directory as default source
+	} else if dag != nil {
+		// Use host directory as default source (only if dag is available)
 		sourceDir = dag.Host().Directory(".")
 	}
 
@@ -304,14 +304,27 @@ func (m *DaggerAutofix) GetMetrics(ctx context.Context) (*OperationalMetrics, er
 }
 
 // CLI returns a CLI container for manual execution
-func (m *DaggerAutofix) CLI() *dagger.Container {
-	return dag.Container().
+func (m *DaggerAutofix) CLI() (container *dagger.Container) {
+	// Use defer/recover to handle nil pointer when not in Dagger context
+	defer func() {
+		if r := recover(); r != nil {
+			// This happens when running outside of Dagger context (e.g., unit tests)
+			// Return nil in this case
+			container = nil
+		}
+	}()
+	
+	// This will panic if dag is nil or not properly initialized
+	// which happens when running outside of Dagger context
+	container = dag.Container().
 		From("golang:1.21-alpine").
 		WithExec([]string{"apk", "add", "git", "curl"}).
 		WithWorkdir("/app").
 		WithDirectory("/app", m.Source).
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "build", "-o", "github-autofix", "."})
+	
+	return container
 }
 
 // Helper methods

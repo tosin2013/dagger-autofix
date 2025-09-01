@@ -21,7 +21,7 @@ func TestDaggerAutofix(t *testing.T) {
 	t.Run("WithConfiguration", func(t *testing.T) {
 		_ = context.Background()
 		module := New().
-			WithLLMProvider("anthropic", dag.SetSecret("test-key", "test-value")).
+			WithLLMProvider("anthropic", createTestSecret("test-key", "test-value")).
 			WithRepository("owner", "repo").
 			WithTargetBranch("develop").
 			WithMinCoverage(90)
@@ -42,8 +42,8 @@ func TestDaggerAutofix(t *testing.T) {
 		assert.Contains(t, err.Error(), "GitHub token is required")
 
 		// Valid configuration
-		module.GitHubToken = dag.SetSecret("github-token", "test-token")
-		module.LLMAPIKey = dag.SetSecret("llm-key", "test-key")
+		module.GitHubToken = createTestSecret("github-token", "test-token")
+		module.LLMAPIKey = createTestSecret("llm-key", "test-key")
 		module.RepoOwner = "owner"
 		module.RepoName = "repo"
 		
@@ -102,7 +102,7 @@ func TestLLMClient(t *testing.T) {
 	// Mock test - in real tests, you'd use actual API keys for integration testing
 	t.Run("NewLLMClient", func(t *testing.T) {
 		ctx := context.Background()
-		apiKey := dag.SetSecret("test-key", "test-value")
+		apiKey := createTestSecret("test-key", "test-value")
 		
 		// This would fail in real testing without valid API key
 		_, err := NewLLMClient(ctx, OpenAI, apiKey)
@@ -264,8 +264,8 @@ func TestPromptTemplates(t *testing.T) {
 func TestConfigValidation(t *testing.T) {
 	t.Run("ValidConfiguration", func(t *testing.T) {
 		module := &DaggerAutofix{
-			GitHubToken: dag.SetSecret("github-token", "valid-token"),
-			LLMAPIKey:   dag.SetSecret("llm-key", "valid-key"),
+			GitHubToken: createTestSecret("github-token", "valid-token"),
+			LLMAPIKey:   createTestSecret("llm-key", "valid-key"),
 			RepoOwner:   "test-owner",
 			RepoName:    "test-repo",
 		}
@@ -276,7 +276,7 @@ func TestConfigValidation(t *testing.T) {
 
 	t.Run("MissingGitHubToken", func(t *testing.T) {
 		module := &DaggerAutofix{
-			LLMAPIKey: dag.SetSecret("llm-key", "valid-key"),
+			LLMAPIKey: createTestSecret("llm-key", "valid-key"),
 			RepoOwner: "test-owner",
 			RepoName:  "test-repo",
 		}
@@ -288,7 +288,7 @@ func TestConfigValidation(t *testing.T) {
 
 	t.Run("MissingLLMKey", func(t *testing.T) {
 		module := &DaggerAutofix{
-			GitHubToken: dag.SetSecret("github-token", "valid-token"),
+			GitHubToken: createTestSecret("github-token", "valid-token"),
 			RepoOwner:   "test-owner",
 			RepoName:    "test-repo",
 		}
@@ -300,8 +300,8 @@ func TestConfigValidation(t *testing.T) {
 
 	t.Run("MissingRepository", func(t *testing.T) {
 		module := &DaggerAutofix{
-			GitHubToken: dag.SetSecret("github-token", "valid-token"),
-			LLMAPIKey:   dag.SetSecret("llm-key", "valid-key"),
+			GitHubToken: createTestSecret("github-token", "valid-token"),
+			LLMAPIKey:   createTestSecret("llm-key", "valid-key"),
 		}
 
 		err := module.validateConfiguration()

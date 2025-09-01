@@ -1,0 +1,100 @@
+# Testing Configuration for Different Frameworks
+
+# Node.js Project
+node_js:
+  framework_name: "Node.js"
+  test_commands:
+    install: "npm install"
+    lint: "npm run lint"
+    test: "npm test"
+    coverage: "npm run coverage"
+    build: "npm run build"
+  config_files:
+    - "package.json"
+    - "jest.config.js"
+    - ".eslintrc.js"
+    - "tsconfig.json"
+  coverage_threshold: 85
+  coverage_format: "lcov"
+
+# Go Project
+go:
+  framework_name: "Go"
+  test_commands:
+    install: "go mod download"
+    lint: "golangci-lint run"
+    test: "go test ./..."
+    coverage: "go test -coverprofile=coverage.out ./..."
+    build: "go build ./..."
+  config_files:
+    - "go.mod"
+    - "go.sum"
+    - ".golangci.yml"
+  coverage_threshold: 85
+  coverage_format: "go"
+
+# Python Project
+python:
+  framework_name: "Python"
+  test_commands:
+    install: "pip install -r requirements.txt"
+    lint: "flake8 . && black --check ."
+    test: "pytest"
+    coverage: "pytest --cov=. --cov-report=xml"
+    build: "python setup.py build"
+  config_files:
+    - "requirements.txt"
+    - "setup.py"
+    - "pyproject.toml"
+    - "pytest.ini"
+    - ".flake8"
+  coverage_threshold: 85
+  coverage_format: "xml"
+
+# Java Maven Project
+maven:
+  framework_name: "Maven"
+  test_commands:
+    install: "mvn dependency:resolve"
+    lint: "mvn checkstyle:check"
+    test: "mvn test"
+    coverage: "mvn jacoco:report"
+    build: "mvn compile"
+  config_files:
+    - "pom.xml"
+    - "checkstyle.xml"
+  coverage_threshold: 85
+  coverage_format: "jacoco"
+
+# Rust Project
+rust:
+  framework_name: "Rust"
+  test_commands:
+    install: "cargo fetch"
+    lint: "cargo clippy -- -D warnings"
+    test: "cargo test"
+    coverage: "cargo tarpaulin --out xml"
+    build: "cargo build"
+  config_files:
+    - "Cargo.toml"
+    - "Cargo.lock"
+    - "clippy.toml"
+  coverage_threshold: 85
+  coverage_format: "cobertura"
+
+# PHP Project
+php:
+  framework_name: "PHP"
+  test_commands:
+    install: "composer install"
+    lint: "./vendor/bin/phpcs"
+    test: "./vendor/bin/phpunit"
+    coverage: "./vendor/bin/phpunit --coverage-xml coverage"
+    build: "composer dump-autoload --optimize"
+  config_files:
+    - "composer.json"
+    - "composer.lock"
+    - "phpunit.xml"
+    - "phpcs.xml"
+  coverage_threshold: 85
+  coverage_format: "clover"

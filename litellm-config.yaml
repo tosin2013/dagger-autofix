@@ -1,0 +1,76 @@
+name: dagger-autofix-tests
+
+model_list:
+  # OpenAI Models
+  - model_name: gpt-4o
+    litellm_params:
+      model: gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+      temperature: 0.1
+      max_tokens: 4000
+
+  # Anthropic Models
+  - model_name: claude-3-5-sonnet
+    litellm_params:
+      model: claude-3-5-sonnet-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+      temperature: 0.1
+      max_tokens: 4000
+
+  # Google Gemini Models
+  - model_name: gemini-2-flash
+    litellm_params:
+      model: gemini/gemini-2.0-flash-exp
+      api_key: os.environ/GOOGLE_API_KEY
+      temperature: 0.1
+      max_tokens: 4000
+
+  # DeepSeek Models
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+      temperature: 0.1
+      max_tokens: 4000
+
+  # AWS Bedrock Models
+  - model_name: bedrock-claude-3-5-sonnet
+    litellm_params:
+      model: bedrock/anthropic.claude-3-5-sonnet-20240620-v1:0
+      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
+      aws_region_name: os.environ/AWS_REGION_NAME
+      temperature: 0.1
+      max_tokens: 4000
+
+# General Settings
+general_settings:
+  completion_model: gpt-4o
+  embedding_model: text-embedding-ada-002
+  database_url: sqlite:///autofix.db
+  store_model_in_db: true
+  max_budget: 100
+  budget_duration: 30d
+
+# Router Settings
+router_settings:
+  routing_strategy: simple-shuffle
+  model_list:
+    - gpt-4o
+    - claude-3-5-sonnet
+    - gemini-2-flash
+  fallbacks:
+    - model: gpt-4o
+      fallbacks:
+        - claude-3-5-sonnet
+        - gemini-2-flash
+  retry_policy:
+    retries: 3
+    timeout: 60
+
+# Environment Variables for LiteLLM Proxy
+environment_variables:
+  LITELLM_LOG: INFO
+  LITELLM_MASTER_KEY: sk-autofix-master-key
+  LITELLM_SALT_KEY: autofix-salt-key-12345
+  DATABASE_URL: sqlite:///autofix_proxy.db

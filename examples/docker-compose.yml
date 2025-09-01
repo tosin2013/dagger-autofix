@@ -1,0 +1,151 @@
+# Docker Compose setup for GitHub Actions Auto-Fix Agent
+# Includes LiteLLM proxy, Redis cache, and monitoring stack
+
+version: '3.8'
+
+services:
+  # Main auto-fix agent
+  github-autofix:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: github-autofix
+    restart: unless-stopped
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - LLM_PROVIDER=litellm
+      - LLM_API_KEY=litellm-token
+      - LITELLM_BASE_URL=http://litellm:4000
+      - REPO_OWNER=${REPO_OWNER}
+      - REPO_NAME=${REPO_NAME}
+      - CACHE_BACKEND=redis
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=info
+      - METRICS_ENABLED=true
+    ports:
+      - "8080:8080"  # Health check port
+      - "9090:9090"  # Metrics port
+    depends_on:
+      - litellm
+      - redis
+    volumes:
+      - ./logs:/var/log/github-autofix
+      - ./config:/etc/github-autofix
+    networks:
+      - autofix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # LiteLLM proxy for multi-provider support
+  litellm:
+    image: ghcr.io/berriai/litellm:latest
+    container_name: litellm-proxy
+    restart: unless-stopped
+    environment:
+      - LITELLM_MASTER_KEY=litellm-token
+      - LITELLM_LOG_LEVEL=INFO
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml"]
+    networks:
+      - autofix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - autofix-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - autofix-network
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - autofix-network
+    depends_on:
+      - prometheus
+
+  # Webhook server for notifications
+  webhook-server:
+    build:
+      context: ./webhook-server
+      dockerfile: Dockerfile
+    container_name: webhook-server
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    environment:
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - NOTIFICATION_CHANNEL=${NOTIFICATION_CHANNEL:-#ci-alerts}
+    networks:
+      - autofix-network
+
+volumes:
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  autofix-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
