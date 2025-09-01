@@ -250,6 +250,5 @@ func TestMemoryUsage(t *testing.T) {
 		}
 		
 		// Force garbage collection to clean up
-		modules = nil
 	})
 }

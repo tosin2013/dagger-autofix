@@ -20,6 +20,14 @@ const (
 	MaxConcurrentOps     = 10
 )
 
+// Custom context key types to avoid collisions
+type contextKey string
+
+const (
+	operationContextKey contextKey = "operation"
+	timeoutContextKey   contextKey = "timeout"
+)
+
 // EnhancedFailureAnalysisEngine provides improved failure analysis with better error handling
 type EnhancedFailureAnalysisEngine struct {
 	llmClient      *LLMClient
@@ -340,8 +348,8 @@ func createTimeoutContext(parent context.Context, operation string, timeout time
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	
 	// Add operation info to context for better debugging
-	ctx = context.WithValue(ctx, "operation", operation)
-	ctx = context.WithValue(ctx, "timeout", timeout)
+	ctx = context.WithValue(ctx, operationContextKey, operation)
+	ctx = context.WithValue(ctx, timeoutContextKey, timeout)
 	
 	return ctx, cancel
 }

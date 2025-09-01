@@ -12,15 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// initDagger initializes the global Dagger client
-// Note: dag is already declared in dag.go as a daggerClient interface
-func initDagger(ctx context.Context) error {
-	// In a real Dagger environment, dag is provided by the runtime
-	// For standalone execution, we can optionally connect to a real client
-	// but the mock in dag.go is sufficient for compilation
-	return nil
-}
-
 // DaggerAutofix represents the main Dagger module for GitHub Actions auto-fixing
 type DaggerAutofix struct {
 	// Source directory for the project

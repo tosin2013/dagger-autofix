@@ -214,7 +214,6 @@ func TestErrorScenarios(t *testing.T) {
 		assert.Len(t, modules, numModules)
 		
 		// Cleanup
-		modules = nil
 	})
 }
 
