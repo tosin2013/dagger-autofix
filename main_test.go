@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -90,7 +91,7 @@ func TestFailureClassification(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			engine := NewFailureAnalysisEngine(nil, nil)
+			engine := NewFailureAnalysisEngine(nil, logrus.New())
 			classification := engine.preClassifyFailure(tc.context)
 			assert.Equal(t, tc.expected, classification.Type)
 		})
