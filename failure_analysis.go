@@ -149,8 +149,11 @@ func (e *FailureAnalysisEngine) GenerateFixes(ctx context.Context, analysis *Fai
 
 // preClassifyFailure performs initial classification using pattern matching
 func (e *FailureAnalysisEngine) preClassifyFailure(ctx FailureContext) *FailureClassification {
-	errorLines := strings.Join(ctx.Logs.ErrorLines, "\n")
-	allLogs := ctx.Logs.RawLogs
+	var errorLines, allLogs string
+	if ctx.Logs != nil {
+		errorLines = strings.Join(ctx.Logs.ErrorLines, "\n")
+		allLogs = ctx.Logs.RawLogs
+	}
 
 	// Check against known patterns
 	for patternName, rule := range e.patterns.Patterns {
