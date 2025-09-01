@@ -561,3 +561,181 @@ func createMockServerWithTools(t *testing.T) *httptest.Server {
 		w.Write([]byte(response))
 	}))
 }
+// NOTE: Tests use Go testing + testify (assert/require).
+
+// TestLLMClient_MakeRequestHeaders_Extended verifies auth/content-type headers and JSON body presence across providers.
+func TestLLMClient_MakeRequestHeaders_Extended(t *testing.T) {
+	type seen struct {
+		Method   string
+		Auth     string
+		APIKey   string
+		GoogKey  string
+		CT       string
+		BodyMap  map[string]any
+	}
+	cases := []struct {
+		name     string
+		provider LLMProvider
+	}{
+		{"OpenAI headers", OpenAI},
+		{"Anthropic headers", Anthropic},
+		{"Gemini headers", Gemini},
+		{"DeepSeek headers", DeepSeek},
+		{"LiteLLM headers", LiteLLM},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := &seen{}
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got.Method = r.Method
+				got.Auth = r.Header.Get("Authorization")
+				got.APIKey = r.Header.Get("x-api-key")
+				got.GoogKey = r.Header.Get("x-goog-api-key")
+				got.CT = r.Header.Get("Content-Type")
+				_ = json.NewDecoder(r.Body).Decode(&got.BodyMap)
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"ok": true}`))
+			}))
+			defer srv.Close()
+
+			client := createTestClient(tc.provider, srv.URL)
+			payload := map[string]any{"model": "test-model", "temperature": 0.1}
+			_, err := client.makeRequest(context.Background(), http.MethodPost, "/unit/test", payload)
+			assert.NoError(t, err)
+
+			assert.Equal(t, http.MethodPost, got.Method)
+			assert.Contains(t, strings.ToLower(got.CT), "application/json")
+
+			// Expect at least one auth mechanism to be present.
+			hasAuth := got.Auth != "" || got.APIKey != "" || got.GoogKey != ""
+			assert.True(t, hasAuth, "expected Authorization or x-api-key or x-goog-api-key to be set")
+
+			// Verify JSON body and presence of "model".
+			require.NotNil(t, got.BodyMap)
+			_, hasModel := got.BodyMap["model"]
+			assert.True(t, hasModel, "payload should include model")
+		})
+	}
+}
+
+// TestLLMClient_RetryOnTransientError_Extended ensures a retry occurs on initial 5xx then success.
+func TestLLMClient_RetryOnTransientError_Extended(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		if calls == 1 {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":"temporary"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(mockResponses[OpenAI]))
+	}))
+	defer srv.Close()
+
+	client := createTestClient(OpenAI, srv.URL)
+	client.config.RetryCount = 2
+
+	resp, err := client.Chat(context.Background(), &LLMRequest{Prompt: "hi"})
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.GreaterOrEqual(t, calls, 2, "expected at least one retry after initial 5xx")
+}
+
+// TestLLMClient_ContextCancel_Extended ensures request honors context cancellation.
+func TestLLMClient_ContextCancel_Extended(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(mockResponses[OpenAI]))
+	}))
+	defer srv.Close()
+
+	client := createTestClient(OpenAI, srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	res, err := client.Chat(ctx, &LLMRequest{Prompt: "hello"})
+	assert.Error(t, err)
+	assert.Nil(t, res)
+	assert.Contains(t, strings.ToLower(err.Error()), "context")
+}
+
+// TestLLMClient_InvalidInputs_Extended checks behavior with invalid baseURL and empty prompt.
+func TestLLMClient_InvalidInputs_Extended(t *testing.T) {
+	client := &LLMClient{
+		provider:   OpenAI,
+		apiKey:     "key",
+		baseURL:    "http://127.0.0.1:0", // invalid port to force failure
+		httpClient: &http.Client{Timeout: 50 * time.Millisecond},
+		logger:     logrus.New(),
+		config:     getDefaultConfig(OpenAI),
+	}
+
+	resp, err := client.Chat(context.Background(), &LLMRequest{Prompt: ""})
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+}
+
+// TestLLMClient_ResponseParsing_Anthropic_MissingContent_Extended validates error when content array empty.
+func TestLLMClient_ResponseParsing_Anthropic_MissingContent_Extended(t *testing.T) {
+	client := createTestClient(Anthropic, "https://example.com")
+	var data map[string]any
+	err := json.Unmarshal([]byte(`{"id":"x","type":"message","content":[]}`), &data)
+	require.NoError(t, err)
+
+	res, perr := client.parseAnthropicResponse(data)
+	assert.Error(t, perr)
+	assert.Nil(t, res)
+}
+
+// TestLLMClient_ResponseParsing_Gemini_MissingParts_Extended validates error when parts are missing.
+func TestLLMClient_ResponseParsing_Gemini_MissingParts_Extended(t *testing.T) {
+	client := createTestClient(Gemini, "https://example.com")
+	var data map[string]any
+	err := json.Unmarshal([]byte(`{"candidates":[{"content":{"role":"model","parts":[]}}]}`), &data)
+	require.NoError(t, err)
+
+	res, perr := client.parseGeminiResponse(data)
+	assert.Error(t, perr)
+	assert.Nil(t, res)
+}
+
+// TestLLMClient_ParseOpenAI_ToolCalls_Extended ensures tool_calls parsing works via parseOpenAIResponse.
+func TestLLMClient_ParseOpenAI_ToolCalls_Extended(t *testing.T) {
+	client := createTestClient(OpenAI, "https://example.com")
+	response := `{
+		"id": "chatcmpl-123",
+		"object": "chat.completion",
+		"created": 1677652288,
+		"model": "gpt-4",
+		"choices": [{
+			"index": 0,
+			"message": {
+				"role": "assistant",
+				"content": "",
+				"tool_calls": [{
+					"id": "call_123",
+					"type": "function",
+					"function": {
+						"name": "get_weather",
+						"arguments": "{\"location\": \"New York City\"}"
+					}
+				}]
+			},
+			"finish_reason": "tool_calls"
+		}],
+		"usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+	}`
+	var respData map[string]any
+	require.NoError(t, json.Unmarshal([]byte(response), &respData))
+
+	res, err := client.parseOpenAIResponse(respData)
+	assert.NoError(t, err)
+	require.NotNil(t, res)
+	require.Len(t, res.ToolCalls, 1)
+	assert.Equal(t, "get_weather", res.ToolCalls[0].Name)
+}
