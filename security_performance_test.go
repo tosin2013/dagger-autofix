@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -192,7 +191,6 @@ func TestPerformanceValidation(t *testing.T) {
 		assert.Len(t, modules, iterations)
 		
 		// Test memory cleanup
-		modules = nil
 		// In a real test, we would monitor actual memory usage
 	})
 
@@ -488,21 +486,11 @@ func TestEdgeCases(t *testing.T) {
 
 func generateRandomString(length int) string {
 	bytes := make([]byte, length)
-	rand.Read(bytes)
+	if _, err := rand.Read(bytes); err != nil {
+		// Fallback to timestamp-based string if random fails
+		return fmt.Sprintf("test-data-%d", time.Now().UnixNano())[:length]
+	}
 	return base64.URLEncoding.EncodeToString(bytes)[:length]
-}
-
-func createMockSecret(name string) *mockSecret {
-	return &mockSecret{name: name, value: "mock-" + name + "-value"}
-}
-
-type mockSecret struct {
-	name  string
-	value string
-}
-
-func (s *mockSecret) Plaintext(ctx context.Context) (string, error) {
-	return s.value, nil
 }
 
 // Benchmarks for performance validation

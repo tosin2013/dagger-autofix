@@ -8,6 +8,8 @@ import (
 
 	"github.com/google/go-github/v45/github"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // PullRequestEngine handles automated pull request creation and management
@@ -346,8 +348,9 @@ func (p *PullRequestEngine) generatePRContent(analysis *FailureAnalysisResult, f
 }
 
 func (p *PullRequestEngine) generatePRTitle(analysis *FailureAnalysisResult, fix *ProposedFix) string {
-	fixType := strings.Title(string(fix.Type))
-	failureType := strings.Title(string(analysis.Classification.Type))
+	caser := cases.Title(language.English)
+	fixType := caser.String(string(fix.Type))
+	failureType := caser.String(string(analysis.Classification.Type))
 
 	return fmt.Sprintf("🤖 Auto-fix: %s for %s failure (Run #%d)", fixType, failureType, analysis.Context.WorkflowRun.ID)
 }
@@ -384,7 +387,8 @@ func (p *PullRequestEngine) generatePRBody(analysis *FailureAnalysisResult, fix 
 	if len(fix.Fix.Changes) > 0 {
 		body.WriteString("## 📝 Changes Made\n\n")
 		for _, change := range fix.Fix.Changes {
-			body.WriteString(fmt.Sprintf("- **%s**: %s `%s`\n", strings.Title(change.Operation), change.FilePath, change.Explanation))
+			caser := cases.Title(language.English)
+			body.WriteString(fmt.Sprintf("- **%s**: %s `%s`\n", caser.String(change.Operation), change.FilePath, change.Explanation))
 		}
 		body.WriteString("\n")
 	}

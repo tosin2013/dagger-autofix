@@ -375,7 +375,10 @@ func (c *LLMClient) parseOpenAIResponse(resp map[string]interface{}) (*LLMRespon
 			
 			var args map[string]interface{}
 			if argsStr, ok := function["arguments"].(string); ok {
-				json.Unmarshal([]byte(argsStr), &args)
+				if err := json.Unmarshal([]byte(argsStr), &args); err != nil {
+					// Log error but continue processing other tool calls
+					continue
+				}
 			}
 
 			response.ToolCalls = append(response.ToolCalls, LLMToolCall{

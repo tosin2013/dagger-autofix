@@ -15,7 +15,6 @@ import (
 type CLI struct {
 	logger *logrus.Logger
 	rootCmd *cobra.Command
-	agent  *DaggerAutofix
 }
 
 // CLIConfig holds CLI configuration
