@@ -5,9 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestDaggerAutofix tests the main module functionality
@@ -21,7 +19,7 @@ func TestDaggerAutofix(t *testing.T) {
 	})
 
 	t.Run("WithConfiguration", func(t *testing.T) {
-		ctx := context.Background()
+		_ = context.Background()
 		module := New().
 			WithLLMProvider("anthropic", dag.SetSecret("test-key", "test-value")).
 			WithRepository("owner", "repo").

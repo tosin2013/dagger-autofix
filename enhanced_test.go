@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"dagger.io/dagger"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,7 +35,7 @@ func TestEnhancedIntegration(t *testing.T) {
 	})
 
 	t.Run("ConcurrentOperations", func(t *testing.T) {
-		module := setupTestModule(t)
+		_ = setupTestModule(t)
 		const numConcurrent = 10
 		
 		var wg sync.WaitGroup
@@ -88,7 +86,7 @@ func TestErrorScenarios(t *testing.T) {
 		module := setupTestModule(t)
 		
 		// Simulate timeout context
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+		_, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel()
 		
 		// This should handle timeout gracefully
@@ -99,7 +97,7 @@ func TestErrorScenarios(t *testing.T) {
 
 	t.Run("InvalidInputs", func(t *testing.T) {
 		module := setupTestModule(t)
-		_ = context.Background()
+		ctx := context.Background()
 		
 		// Test invalid run IDs
 		invalidRunIDs := []int64{-1, 0, -999999}
@@ -347,7 +345,7 @@ func TestSecurityScenarios(t *testing.T) {
 	t.Run("ResourceLimits", func(t *testing.T) {
 		// Test that operations respect resource limits
 		// Create a context with short timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		_, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 		
 		module := setupTestModule(t)

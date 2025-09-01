@@ -274,7 +274,7 @@ jobs:
     
     - name: Upload Test Results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-results-${{ matrix.os }}-go${{ matrix.go-version }}
         path: |
@@ -332,7 +332,7 @@ jobs:
     
     steps:
     - name: Download all test results
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: all-test-results
     
@@ -378,7 +378,7 @@ jobs:
         cat final-summary.md >> $GITHUB_STEP_SUMMARY
     
     - name: Upload Final Summary
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: test-execution-summary
         path: final-summary.md

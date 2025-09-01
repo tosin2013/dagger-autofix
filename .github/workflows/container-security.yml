@@ -236,7 +236,7 @@ EOF
     
     - name: Upload custom image scan results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: custom-image-security-reports
         path: container-security-reports/
@@ -294,7 +294,7 @@ EOF
     
     - name: Upload compose image scan results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: compose-image-security-reports-${{ strategy.job-index }}
         path: container-security-reports/
@@ -346,7 +346,7 @@ EOF
     
     - name: Upload filesystem scan results
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: filesystem-security-reports
         path: container-security-reports/
@@ -364,7 +364,7 @@ EOF
       uses: actions/checkout@v4
     
     - name: Download all security reports
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: all-security-reports/
     
@@ -539,7 +539,7 @@ EOF
     
     - name: Upload aggregated security reports
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: aggregated-container-security-reports
         path: |

@@ -432,7 +432,7 @@ EOF
     
     - name: Upload coverage validation artifacts
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-validation-results
         path: |
@@ -511,7 +511,7 @@ EOF
         fetch-depth: 100 # Get more history for trend analysis
     
     - name: Download validation results
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: coverage-validation-results
         path: coverage-validation-results
@@ -576,7 +576,7 @@ EOF
         echo "✅ Coverage trend analysis completed"
     
     - name: Upload trend analysis
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: coverage-trend-analysis
         path: coverage-trends/

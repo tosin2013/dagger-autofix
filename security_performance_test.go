@@ -10,7 +10,7 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
-	"io"
+	
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -310,7 +310,7 @@ Build failed with exit code 1
 
 	t.Run("ErrorRecoveryChain", func(t *testing.T) {
 		// Test error recovery in complex scenarios
-		module := New()
+		_ = New()
 		
 		// Test graceful handling of multiple errors
 		errors := []error{
@@ -332,7 +332,7 @@ Build failed with exit code 1
 func TestConfigurationValidation(t *testing.T) {
 	t.Run("EnvironmentVariableOverrides", func(t *testing.T) {
 		// Test environment variable precedence
-		cli := NewCLI()
+		_ = NewCLI()
 		
 		// Test various configuration sources
 		testCases := []struct {
@@ -400,11 +400,11 @@ func TestConfigurationValidation(t *testing.T) {
 				module := New().WithRepository(tc.repoOwner, tc.repoName)
 				
 				if tc.hasGitHubToken {
-					module = module.WithGitHubToken(createMockSecret("github-token"))
+					module = module.WithGitHubToken(dag.SetSecret("github-token", "mock-token"))
 				}
 				
 				if tc.hasLLMKey {
-					module = module.WithLLMProvider("openai", createMockSecret("llm-key"))
+					module = module.WithLLMProvider("openai", dag.SetSecret("llm-key", "mock-key"))
 				}
 				
 				err := module.validateConfiguration()
@@ -547,10 +547,10 @@ func BenchmarkConcurrentModuleCreation(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		counter := 0
 		for pb.Next() {
-			_ = New().
+			module := New().
 				WithRepository(fmt.Sprintf("owner-%d", counter), "repo").
 				WithMinCoverage(85)
-			counter++
+			_ = module; counter++
 		}
 	})
 }
