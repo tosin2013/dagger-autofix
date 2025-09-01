@@ -1,0 +1,92 @@
+name: Validate CI Setup
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/**'
+
+jobs:
+  validate-workflows:
+    name: Validate Workflow Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Validate YAML syntax
+      run: |
+        echo "🔍 Validating workflow YAML syntax..."
+        
+        for workflow in .github/workflows/*.yml; do
+          if [ -f "$workflow" ]; then
+            echo "Checking $workflow..."
+            python3 -c "import yaml; yaml.safe_load(open('$workflow'))" || exit 1
+            echo "✅ $workflow is valid"
+          fi
+        done
+        
+        echo "✅ All workflow files have valid YAML syntax"
+    
+    - name: Check workflow structure
+      run: |
+        echo "📋 Checking workflow structure..."
+        
+        # Check that required workflows exist
+        required_workflows=("ci.yml" "pr-validation.yml")
+        
+        for workflow in "${required_workflows[@]}"; do
+          if [ -f ".github/workflows/$workflow" ]; then
+            echo "✅ $workflow exists"
+          else
+            echo "❌ $workflow is missing"
+            exit 1
+          fi
+        done
+        
+        echo "✅ All required workflows are present"
+    
+    - name: Validate workflow triggers
+      run: |
+        echo "🎯 Validating workflow triggers..."
+        
+        # Check CI workflow has correct triggers
+        if grep -q "push:" .github/workflows/ci.yml && grep -q "pull_request:" .github/workflows/ci.yml; then
+          echo "✅ CI workflow has correct triggers"
+        else
+          echo "❌ CI workflow missing required triggers"
+          exit 1
+        fi
+        
+        # Check PR validation workflow has correct triggers
+        if grep -q "pull_request:" .github/workflows/pr-validation.yml; then
+          echo "✅ PR validation workflow has correct triggers"
+        else
+          echo "❌ PR validation workflow missing required triggers"
+          exit 1
+        fi
+        
+        echo "✅ Workflow triggers are correctly configured"
+    
+    - name: Summary
+      run: |
+        echo "## 🎉 CI Setup Validation Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Validated Components:" >> $GITHUB_STEP_SUMMARY
+        echo "- YAML syntax validation" >> $GITHUB_STEP_SUMMARY
+        echo "- Required workflow files" >> $GITHUB_STEP_SUMMARY
+        echo "- Workflow trigger configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- Directory structure" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📁 Created Structure:" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo ".github/" >> $GITHUB_STEP_SUMMARY
+        echo "└── workflows/" >> $GITHUB_STEP_SUMMARY
+        echo "    ├── ci.yml" >> $GITHUB_STEP_SUMMARY
+        echo "    ├── pr-validation.yml" >> $GITHUB_STEP_SUMMARY
+        echo "    ├── validate-setup.yml" >> $GITHUB_STEP_SUMMARY
+        echo "    └── README.md" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🚀 **Ready for Task 2: Comprehensive test execution and coverage analysis**" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,511 @@
+name: Coverage Analysis and Reporting
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+    inputs:
+      generate_badges:
+        description: 'Generate coverage badges'
+        required: false
+        default: true
+        type: boolean
+      detailed_analysis:
+        description: 'Run detailed coverage analysis'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  COVERAGE_THRESHOLD: 85
+  GO_VERSION: '1.21'
+
+jobs:
+  coverage-collection:
+    name: Coverage Collection and Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    
+    - name: Install coverage tools
+      run: |
+        echo "🔧 Installing coverage analysis tools..."
+        
+        # Core coverage tools
+        go install github.com/axw/gocov/gocov@latest
+        go install github.com/AlekSi/gocov-xml@latest
+        go install github.com/wadey/gocovmerge@latest
+        
+        # Advanced coverage tools
+        go install github.com/t-yuki/gocover-cobertura@latest
+        go install gotest.tools/gotestsum@latest
+        
+        # Coverage badge generation
+        go install github.com/jpoles1/gopherbadger@latest
+        
+        # Coverage analysis tools
+        go install github.com/dave/courtney@latest
+        
+        echo "✅ Coverage tools installed"
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-coverage-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-coverage-
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+    
+    - name: Install dependencies
+      run: |
+        go mod download
+        go mod verify
+    
+    - name: Create coverage directories
+      run: |
+        mkdir -p coverage-reports/{html,xml,json,badges}
+        mkdir -p coverage-data/{unit,integration,functional}
+        mkdir -p coverage-analysis
+    
+    - name: Run Unit Tests with Coverage
+      run: |
+        echo "🧪 Running unit tests with detailed coverage..."
+        
+        gotestsum \
+          --format testname \
+          --junitfile coverage-reports/unit-tests.xml \
+          -- \
+          -race \
+          -timeout=20m \
+          -parallel=4 \
+          -coverprofile=coverage-data/unit/coverage.out \
+          -covermode=atomic \
+          -coverpkg=./... \
+          -tags=unit \
+          ./...
+        
+        echo "✅ Unit tests completed with coverage"
+    
+    - name: Run Integration Tests with Coverage
+      run: |
+        echo "🔗 Running integration tests with coverage..."
+        
+        gotestsum \
+          --format testname \
+          --junitfile coverage-reports/integration-tests.xml \
+          -- \
+          -race \
+          -timeout=20m \
+          -parallel=2 \
+          -coverprofile=coverage-data/integration/coverage.out \
+          -covermode=atomic \
+          -coverpkg=./... \
+          -tags=integration \
+          ./...
+        
+        echo "✅ Integration tests completed with coverage"
+    
+    - name: Run Functional Tests with Coverage
+      run: |
+        echo "🎯 Running functional tests with coverage..."
+        
+        gotestsum \
+          --format testname \
+          --junitfile coverage-reports/functional-tests.xml \
+          -- \
+          -timeout=20m \
+          -parallel=1 \
+          -coverprofile=coverage-data/functional/coverage.out \
+          -covermode=atomic \
+          -coverpkg=./... \
+          -tags=functional,e2e \
+          ./...
+        
+        echo "✅ Functional tests completed with coverage"
+    
+    - name: Merge Coverage Data
+      run: |
+        echo "📊 Merging coverage data from all test types..."
+        
+        # Collect all coverage files
+        coverage_files=""
+        for test_type in unit integration functional; do
+          coverage_file="coverage-data/$test_type/coverage.out"
+          if [ -f "$coverage_file" ] && [ -s "$coverage_file" ]; then
+            coverage_files="$coverage_files $coverage_file"
+            echo "✅ Found coverage data for $test_type tests"
+          else
+            echo "⚠️ No coverage data found for $test_type tests"
+          fi
+        done
+        
+        if [ -n "$coverage_files" ]; then
+          gocovmerge $coverage_files > coverage-reports/coverage-merged.out
+          echo "✅ Coverage data merged successfully"
+        else
+          echo "❌ No coverage files found to merge"
+          echo "mode: set" > coverage-reports/coverage-merged.out
+          exit 1
+        fi
+    
+    - name: Generate Comprehensive Coverage Reports
+      run: |
+        echo "📈 Generating comprehensive coverage reports..."
+        
+        # HTML Coverage Report
+        go tool cover -html=coverage-reports/coverage-merged.out -o coverage-reports/html/coverage.html
+        echo "✅ HTML coverage report generated"
+        
+        # Function Coverage Report
+        go tool cover -func=coverage-reports/coverage-merged.out > coverage-reports/coverage-func.txt
+        echo "✅ Function coverage report generated"
+        
+        # XML Coverage Report (Cobertura format)
+        gocov convert coverage-reports/coverage-merged.out | gocov-xml > coverage-reports/xml/coverage.xml
+        echo "✅ XML coverage report generated"
+        
+        # Cobertura Coverage Report
+        gocover-cobertura < coverage-reports/coverage-merged.out > coverage-reports/xml/cobertura-coverage.xml
+        echo "✅ Cobertura coverage report generated"
+        
+        # JSON Coverage Report
+        gocov convert coverage-reports/coverage-merged.out > coverage-reports/json/coverage.json
+        echo "✅ JSON coverage report generated"
+    
+    - name: Generate Package-Level Coverage Analysis
+      run: |
+        echo "📦 Generating package-level coverage analysis..."
+        
+        # Create package coverage breakdown
+        echo "# Package Coverage Analysis" > coverage-analysis/package-coverage.md
+        echo "" >> coverage-analysis/package-coverage.md
+        echo "| Package | Coverage | Functions | Statements |" >> coverage-analysis/package-coverage.md
+        echo "|---------|----------|-----------|------------|" >> coverage-analysis/package-coverage.md
+        
+        # Parse function coverage for package breakdown
+        awk '/^[^[:space:]]/ && !/^total:/ {
+          package = $1
+          gsub(/\/[^\/]*$/, "", package)
+          if (package == "") package = "main"
+          coverage[package] += $3
+          count[package]++
+        }
+        END {
+          for (pkg in coverage) {
+            avg = coverage[pkg] / count[pkg]
+            printf "| %s | %.1f%% | %d | - |\n", pkg, avg, count[pkg]
+          }
+        }' coverage-reports/coverage-func.txt >> coverage-analysis/package-coverage.md
+        
+        echo "✅ Package coverage analysis generated"
+    
+    - name: Calculate Coverage Metrics
+      run: |
+        echo "🔢 Calculating detailed coverage metrics..."
+        
+        # Extract overall coverage percentage
+        COVERAGE=$(go tool cover -func=coverage-reports/coverage-merged.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "COVERAGE_PERCENTAGE=$COVERAGE" >> $GITHUB_ENV
+        
+        # Calculate coverage by test type
+        for test_type in unit integration functional; do
+          coverage_file="coverage-data/$test_type/coverage.out"
+          if [ -f "$coverage_file" ] && [ -s "$coverage_file" ]; then
+            type_coverage=$(go tool cover -func="$coverage_file" | grep total | awk '{print $3}' | sed 's/%//')
+            echo "${test_type^^}_COVERAGE=$type_coverage" >> $GITHUB_ENV
+            echo "$test_type coverage: ${type_coverage}%"
+          fi
+        done
+        
+        # Count total functions and statements
+        TOTAL_FUNCTIONS=$(go tool cover -func=coverage-reports/coverage-merged.out | grep -v total | wc -l)
+        COVERED_FUNCTIONS=$(go tool cover -func=coverage-reports/coverage-merged.out | grep -v total | awk '$3 != "0.0%" {count++} END {print count+0}')
+        
+        echo "TOTAL_FUNCTIONS=$TOTAL_FUNCTIONS" >> $GITHUB_ENV
+        echo "COVERED_FUNCTIONS=$COVERED_FUNCTIONS" >> $GITHUB_ENV
+        
+        echo "Overall coverage: ${COVERAGE}%"
+        echo "Total functions: $TOTAL_FUNCTIONS"
+        echo "Covered functions: $COVERED_FUNCTIONS"
+    
+    - name: Generate Coverage Badges
+      if: ${{ github.event.inputs.generate_badges != 'false' }}
+      run: |
+        echo "🏷️ Generating coverage badges..."
+        
+        # Generate coverage badge
+        gopherbadger -md="README.md" -png=false -manualcov=$COVERAGE_PERCENTAGE
+        
+        # Create custom badges for different coverage levels
+        coverage_color="red"
+        if (( $(echo "$COVERAGE_PERCENTAGE >= 85" | bc -l) )); then
+          coverage_color="brightgreen"
+        elif (( $(echo "$COVERAGE_PERCENTAGE >= 70" | bc -l) )); then
+          coverage_color="yellow"
+        elif (( $(echo "$COVERAGE_PERCENTAGE >= 50" | bc -l) )); then
+          coverage_color="orange"
+        fi
+        
+        # Generate badge URLs
+        echo "COVERAGE_BADGE_URL=https://img.shields.io/badge/coverage-${COVERAGE_PERCENTAGE}%25-${coverage_color}" >> $GITHUB_ENV
+        
+        # Create badge markdown
+        echo "![Coverage](https://img.shields.io/badge/coverage-${COVERAGE_PERCENTAGE}%25-${coverage_color})" > coverage-reports/badges/coverage-badge.md
+        
+        echo "✅ Coverage badges generated"
+    
+    - name: Generate Detailed Coverage Analysis
+      if: ${{ github.event.inputs.detailed_analysis != 'false' }}
+      run: |
+        echo "🔍 Generating detailed coverage analysis..."
+        
+        # Create detailed analysis report
+        echo "# Detailed Coverage Analysis Report" > coverage-analysis/detailed-analysis.md
+        echo "" >> coverage-analysis/detailed-analysis.md
+        echo "Generated on: $(date)" >> coverage-analysis/detailed-analysis.md
+        echo "Commit: ${{ github.sha }}" >> coverage-analysis/detailed-analysis.md
+        echo "" >> coverage-analysis/detailed-analysis.md
+        
+        # Overall metrics
+        echo "## Overall Metrics" >> coverage-analysis/detailed-analysis.md
+        echo "- **Total Coverage**: ${COVERAGE_PERCENTAGE}%" >> coverage-analysis/detailed-analysis.md
+        echo "- **Coverage Threshold**: ${{ env.COVERAGE_THRESHOLD }}%" >> coverage-analysis/detailed-analysis.md
+        echo "- **Total Functions**: $TOTAL_FUNCTIONS" >> coverage-analysis/detailed-analysis.md
+        echo "- **Covered Functions**: $COVERED_FUNCTIONS" >> coverage-analysis/detailed-analysis.md
+        echo "- **Function Coverage**: $(( COVERED_FUNCTIONS * 100 / TOTAL_FUNCTIONS ))%" >> coverage-analysis/detailed-analysis.md
+        echo "" >> coverage-analysis/detailed-analysis.md
+        
+        # Coverage by test type
+        echo "## Coverage by Test Type" >> coverage-analysis/detailed-analysis.md
+        if [ -n "$UNIT_COVERAGE" ]; then
+          echo "- **Unit Tests**: ${UNIT_COVERAGE}%" >> coverage-analysis/detailed-analysis.md
+        fi
+        if [ -n "$INTEGRATION_COVERAGE" ]; then
+          echo "- **Integration Tests**: ${INTEGRATION_COVERAGE}%" >> coverage-analysis/detailed-analysis.md
+        fi
+        if [ -n "$FUNCTIONAL_COVERAGE" ]; then
+          echo "- **Functional Tests**: ${FUNCTIONAL_COVERAGE}%" >> coverage-analysis/detailed-analysis.md
+        fi
+        echo "" >> coverage-analysis/detailed-analysis.md
+        
+        # Low coverage functions (below 50%)
+        echo "## Functions with Low Coverage (< 50%)" >> coverage-analysis/detailed-analysis.md
+        echo "" >> coverage-analysis/detailed-analysis.md
+        echo "| Function | File | Coverage |" >> coverage-analysis/detailed-analysis.md
+        echo "|----------|------|----------|" >> coverage-analysis/detailed-analysis.md
+        
+        awk '$3 != "total:" && $3 != "0.0%" && $3 < "50.0%" {
+          gsub(/%/, "", $3)
+          printf "| %s | %s | %.1f%% |\n", $2, $1, $3
+        }' coverage-reports/coverage-func.txt >> coverage-analysis/detailed-analysis.md
+        
+        # Uncovered functions
+        echo "" >> coverage-analysis/detailed-analysis.md
+        echo "## Uncovered Functions" >> coverage-analysis/detailed-analysis.md
+        echo "" >> coverage-analysis/detailed-analysis.md
+        echo "| Function | File |" >> coverage-analysis/detailed-analysis.md
+        echo "|----------|------|" >> coverage-analysis/detailed-analysis.md
+        
+        awk '$3 == "0.0%" {
+          printf "| %s | %s |\n", $2, $1
+        }' coverage-reports/coverage-func.txt >> coverage-analysis/detailed-analysis.md
+        
+        echo "✅ Detailed coverage analysis generated"
+    
+    - name: Create Coverage Summary
+      run: |
+        echo "📋 Creating coverage summary..."
+        
+        # Create summary for GitHub
+        echo "## 📊 Coverage Analysis Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Overall Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **Coverage**: ${COVERAGE_PERCENTAGE}% (Threshold: ${{ env.COVERAGE_THRESHOLD }}%)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: $(if (( $(echo "$COVERAGE_PERCENTAGE >= ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then echo "✅ PASSED"; else echo "❌ FAILED"; fi)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Functions**: $COVERED_FUNCTIONS/$TOTAL_FUNCTIONS covered" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Coverage by test type
+        if [ -n "$UNIT_COVERAGE" ] || [ -n "$INTEGRATION_COVERAGE" ] || [ -n "$FUNCTIONAL_COVERAGE" ]; then
+          echo "### Coverage by Test Type" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$UNIT_COVERAGE" ]; then
+            echo "- **Unit Tests**: ${UNIT_COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$INTEGRATION_COVERAGE" ]; then
+            echo "- **Integration Tests**: ${INTEGRATION_COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "$FUNCTIONAL_COVERAGE" ]; then
+            echo "- **Functional Tests**: ${FUNCTIONAL_COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Report formats generated
+        echo "### Generated Reports" >> $GITHUB_STEP_SUMMARY
+        echo "- 📄 HTML Report: \`coverage-reports/html/coverage.html\`" >> $GITHUB_STEP_SUMMARY
+        echo "- 📊 XML Report: \`coverage-reports/xml/coverage.xml\`" >> $GITHUB_STEP_SUMMARY
+        echo "- 📋 JSON Report: \`coverage-reports/json/coverage.json\`" >> $GITHUB_STEP_SUMMARY
+        echo "- 🏷️ Coverage Badge: ![Coverage](${COVERAGE_BADGE_URL})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Upload Coverage Reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: |
+          coverage-reports/
+          coverage-data/
+          coverage-analysis/
+        retention-days: 30
+    
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: coverage-reports/coverage-merged.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+    
+    - name: Comment Coverage on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const coverage = process.env.COVERAGE_PERCENTAGE;
+          const threshold = process.env.COVERAGE_THRESHOLD;
+          const unitCoverage = process.env.UNIT_COVERAGE || 'N/A';
+          const integrationCoverage = process.env.INTEGRATION_COVERAGE || 'N/A';
+          const functionalCoverage = process.env.FUNCTIONAL_COVERAGE || 'N/A';
+          
+          const coverageStatus = parseFloat(coverage) >= parseFloat(threshold) ? '✅' : '❌';
+          const badgeUrl = process.env.COVERAGE_BADGE_URL;
+          
+          const comment = `## 📊 Coverage Analysis Report
+          
+          ${coverageStatus} **Overall Coverage: ${coverage}%** (Threshold: ${threshold}%)
+          
+          ![Coverage Badge](${badgeUrl})
+          
+          ### Coverage Breakdown
+          - **Unit Tests**: ${unitCoverage}%
+          - **Integration Tests**: ${integrationCoverage}%
+          - **Functional Tests**: ${functionalCoverage}%
+          
+          ### Report Formats
+          - 📄 [HTML Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - 📊 XML Report (Cobertura/SonarQube compatible)
+          - 📋 JSON Report (machine-readable)
+          
+          <details>
+          <summary>📦 Package Coverage Details</summary>
+          
+          View the detailed package coverage analysis in the workflow artifacts.
+          </details>
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  coverage-trend-analysis:
+    name: Coverage Trend Analysis
+    runs-on: ubuntu-latest
+    needs: coverage-collection
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Download coverage reports
+      uses: actions/download-artifact@v3
+      with:
+        name: coverage-reports
+        path: coverage-reports
+    
+    - name: Setup trend analysis
+      run: |
+        echo "📈 Setting up coverage trend analysis..."
+        mkdir -p coverage-trends
+        
+        # Create or update coverage history
+        if [ -f "coverage-trends/history.json" ]; then
+          echo "Found existing coverage history"
+        else
+          echo "Creating new coverage history"
+          echo "[]" > coverage-trends/history.json
+        fi
+    
+    - name: Update coverage history
+      run: |
+        echo "📊 Updating coverage history..."
+        
+        # Extract current coverage
+        current_coverage=$(grep "total:" coverage-reports/coverage-func.txt | awk '{print $3}' | sed 's/%//')
+        current_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        commit_sha="${{ github.sha }}"
+        
+        # Create new entry
+        new_entry=$(cat <<EOF
+        {
+          "date": "$current_date",
+          "commit": "$commit_sha",
+          "coverage": $current_coverage,
+          "branch": "${{ github.ref_name }}"
+        }
+        EOF
+        )
+        
+        # Add to history (keep last 100 entries)
+        jq --argjson entry "$new_entry" '. += [$entry] | if length > 100 then .[1:] else . end' coverage-trends/history.json > coverage-trends/history-updated.json
+        mv coverage-trends/history-updated.json coverage-trends/history.json
+        
+        echo "✅ Coverage history updated"
+    
+    - name: Generate trend report
+      run: |
+        echo "📈 Generating coverage trend report..."
+        
+        # Calculate trend statistics
+        echo "# Coverage Trend Analysis" > coverage-trends/trend-report.md
+        echo "" >> coverage-trends/trend-report.md
+        echo "Generated on: $(date)" >> coverage-trends/trend-report.md
+        echo "" >> coverage-trends/trend-report.md
+        
+        # Recent coverage values (last 10 entries)
+        echo "## Recent Coverage History" >> coverage-trends/trend-report.md
+        echo "" >> coverage-trends/trend-report.md
+        echo "| Date | Commit | Coverage |" >> coverage-trends/trend-report.md
+        echo "|------|--------|----------|" >> coverage-trends/trend-report.md
+        
+        jq -r '.[-10:] | reverse | .[] | "| \(.date) | \(.commit[0:7]) | \(.coverage)% |"' coverage-trends/history.json >> coverage-trends/trend-report.md
+        
+        echo "✅ Coverage trend report generated"
+    
+    - name: Upload trend analysis
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-trends
+        path: coverage-trends/
+        retention-days: 90

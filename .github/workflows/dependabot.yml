@@ -1,0 +1,216 @@
+name: Dependabot Auto-merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  dependabot-validation:
+    name: Validate Dependabot PR
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.19'
+        cache: true
+    
+    - name: Analyze dependency changes
+      id: changes
+      run: |
+        echo "🔍 Analyzing dependency changes..."
+        
+        # Get the list of changed files
+        git diff --name-only HEAD~1 HEAD > changed_files.txt
+        
+        # Check if go.mod or go.sum changed
+        if grep -q "go.mod\|go.sum" changed_files.txt; then
+          echo "go_deps_changed=true" >> $GITHUB_OUTPUT
+          echo "📦 Go dependencies were updated"
+        else
+          echo "go_deps_changed=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Check if GitHub Actions workflows changed
+        if grep -q ".github/workflows" changed_files.txt; then
+          echo "workflows_changed=true" >> $GITHUB_OUTPUT
+          echo "🔄 GitHub Actions workflows were updated"
+        else
+          echo "workflows_changed=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Check if Dockerfile changed
+        if grep -q "Dockerfile" changed_files.txt; then
+          echo "docker_changed=true" >> $GITHUB_OUTPUT
+          echo "🐳 Docker configuration was updated"
+        else
+          echo "docker_changed=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Validate Go dependencies
+      if: steps.changes.outputs.go_deps_changed == 'true'
+      run: |
+        echo "🔍 Validating Go dependencies..."
+        
+        # Download and verify dependencies
+        go mod download
+        go mod verify
+        
+        # Check for any obvious issues
+        go mod tidy
+        
+        # Verify no unexpected changes after tidy
+        if ! git diff --exit-code go.mod go.sum; then
+          echo "❌ go mod tidy made unexpected changes"
+          git diff go.mod go.sum
+          exit 1
+        fi
+        
+        echo "✅ Go dependencies validation passed"
+    
+    - name: Run security checks
+      if: steps.changes.outputs.go_deps_changed == 'true'
+      run: |
+        echo "🔒 Running security checks on dependencies..."
+        
+        # Install govulncheck if not available
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        
+        # Run vulnerability check
+        if govulncheck ./...; then
+          echo "✅ No known vulnerabilities found"
+        else
+          echo "❌ Vulnerabilities detected in dependencies"
+          exit 1
+        fi
+    
+    - name: Test with new dependencies
+      if: steps.changes.outputs.go_deps_changed == 'true'
+      run: |
+        echo "🧪 Testing with updated dependencies..."
+        
+        # Run a subset of tests to ensure compatibility
+        if go test -short -race ./...; then
+          echo "✅ Tests pass with new dependencies"
+        else
+          echo "❌ Tests fail with new dependencies"
+          exit 1
+        fi
+    
+    - name: Validate workflow changes
+      if: steps.changes.outputs.workflows_changed == 'true'
+      run: |
+        echo "🔍 Validating workflow changes..."
+        
+        # Check YAML syntax
+        for workflow in .github/workflows/*.yml; do
+          if [ -f "$workflow" ]; then
+            echo "Checking $workflow..."
+            python3 -c "import yaml; yaml.safe_load(open('$workflow'))" || exit 1
+          fi
+        done
+        
+        echo "✅ Workflow validation passed"
+    
+    - name: Generate PR summary
+      run: |
+        echo "## 🤖 Dependabot PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.changes.outputs.go_deps_changed }}" == "true" ]; then
+          echo "### 📦 Go Dependencies Updated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dependencies downloaded and verified" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Security scan completed (no vulnerabilities)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Tests pass with new dependencies" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ steps.changes.outputs.workflows_changed }}" == "true" ]; then
+          echo "### 🔄 GitHub Actions Updated" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Workflow YAML syntax validated" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ steps.changes.outputs.docker_changed }}" == "true" ]; then
+          echo "### 🐳 Docker Configuration Updated" >> $GITHUB_STEP_SUMMARY
+          echo "- ℹ️ Docker changes detected" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🎯 Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "- This PR has passed automated validation" >> $GITHUB_STEP_SUMMARY
+        echo "- Full CI pipeline will run after validation" >> $GITHUB_STEP_SUMMARY
+        echo "- Consider auto-merging if all checks pass" >> $GITHUB_STEP_SUMMARY
+
+  auto-merge:
+    name: Auto-merge Dependabot PR
+    runs-on: ubuntu-latest
+    needs: dependabot-validation
+    if: github.actor == 'dependabot[bot]' && success()
+    
+    steps:
+    - name: Get PR details
+      id: pr
+      run: |
+        # Extract PR number from GitHub context
+        PR_NUMBER=$(echo "${{ github.event.pull_request.number }}")
+        echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+        
+        # Get PR title to determine update type
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
+        
+        # Determine if this is a patch/minor update (safer to auto-merge)
+        if echo "$PR_TITLE" | grep -E "(patch|minor)" > /dev/null; then
+          echo "is_safe_update=true" >> $GITHUB_OUTPUT
+          echo "🟢 Safe update detected (patch/minor)"
+        else
+          echo "is_safe_update=false" >> $GITHUB_OUTPUT
+          echo "🟡 Major update detected - manual review recommended"
+        fi
+    
+    - name: Enable auto-merge for safe updates
+      if: steps.pr.outputs.is_safe_update == 'true'
+      run: |
+        echo "🤖 Enabling auto-merge for safe dependency update..."
+        
+        # Use GitHub CLI to enable auto-merge
+        gh pr merge ${{ steps.pr.outputs.pr_number }} \
+          --auto \
+          --squash \
+          --delete-branch
+        
+        echo "✅ Auto-merge enabled - PR will merge when all checks pass"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Add review comment for major updates
+      if: steps.pr.outputs.is_safe_update == 'false'
+      run: |
+        echo "📝 Adding review comment for major update..."
+        
+        gh pr comment ${{ steps.pr.outputs.pr_number }} \
+          --body "🤖 **Dependabot Major Update Detected**
+          
+          This PR contains a major version update that requires manual review:
+          - Review breaking changes in the dependency changelog
+          - Verify compatibility with existing code
+          - Run additional integration tests if needed
+          
+          Once reviewed, you can merge this PR manually or enable auto-merge."
+        
+        echo "✅ Review comment added"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

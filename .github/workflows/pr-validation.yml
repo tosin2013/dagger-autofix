@@ -1,0 +1,90 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [ main, master ]
+
+env:
+  GO_VERSION: '1.19'
+
+jobs:
+  pr-checks:
+    name: PR Quality Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run linting checks
+      run: |
+        # Check for go fmt issues
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "❌ Code is not properly formatted. Run 'go fmt ./...' to fix:"
+          gofmt -s -l .
+          exit 1
+        fi
+        echo "✅ Code formatting is correct"
+    
+    - name: Run go vet
+      run: |
+        go vet ./...
+        echo "✅ go vet passed"
+    
+    - name: Build check
+      run: |
+        echo "🔨 Checking build..."
+        if go build -v . 2>&1; then
+          echo "✅ Build successful"
+        else
+          echo "❌ Build failed - compilation errors detected"
+          echo "This indicates code issues that need to be resolved"
+          exit 1
+        fi
+    
+    - name: Run tests with coverage
+      run: |
+        echo "🧪 Running tests with coverage..."
+        if go test -v -race -coverprofile=coverage.out ./... 2>&1; then
+          echo "✅ Tests completed successfully"
+        else
+          echo "❌ Tests failed - compilation or test errors detected"
+          echo "Creating minimal coverage file for coverage check"
+          echo "mode: set" > coverage.out
+          exit 1
+        fi
+    
+    - name: Check test coverage
+      run: |
+        coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Current coverage: ${coverage}%"
+        
+        # Note: This is a basic coverage check. Full 85% enforcement will be implemented in task 2
+        if (( $(echo "$coverage < 50" | bc -l) )); then
+          echo "⚠️  Coverage is below 50%. Consider adding more tests."
+        else
+          echo "✅ Coverage check passed"
+        fi
+    
+    - name: PR Summary
+      run: |
+        echo "## 📋 PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Code formatting check passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Static analysis (go vet) passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Build successful" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Tests executed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Ready for review! 🚀" >> $GITHUB_STEP_SUMMARY

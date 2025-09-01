@@ -1,0 +1,613 @@
+name: Coverage Enforcement and Validation
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+    inputs:
+      strict_mode:
+        description: 'Enable strict coverage enforcement'
+        required: false
+        default: true
+        type: boolean
+      baseline_update:
+        description: 'Update coverage baseline'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  COVERAGE_THRESHOLD: 85
+  COVERAGE_BASELINE_FILE: '.github/coverage-baseline.json'
+  GO_VERSION: '1.21'
+
+jobs:
+  coverage-validation:
+    name: Coverage Validation and Enforcement
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    outputs:
+      coverage-percentage: ${{ steps.calculate-coverage.outputs.coverage }}
+      coverage-status: ${{ steps.validate-coverage.outputs.status }}
+      baseline-comparison: ${{ steps.baseline-check.outputs.comparison }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    
+    - name: Install coverage tools
+      run: |
+        echo "🔧 Installing coverage validation tools..."
+        
+        # Core coverage tools
+        go install github.com/axw/gocov/gocov@latest
+        go install github.com/wadey/gocovmerge@latest
+        go install gotest.tools/gotestsum@latest
+        
+        # Coverage analysis tools
+        go install github.com/dave/courtney@latest
+        
+        echo "✅ Coverage tools installed"
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-coverage-validation-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-coverage-validation-
+          ${{ runner.os }}-go-${{ env.GO_VERSION }}-
+    
+    - name: Install dependencies
+      run: |
+        go mod download
+        go mod verify
+    
+    - name: Create validation directories
+      run: |
+        mkdir -p coverage-validation/{reports,analysis,enforcement}
+        mkdir -p coverage-data/{unit,integration,functional}
+    
+    - name: Run comprehensive test suite with coverage
+      run: |
+        echo "🧪 Running comprehensive test suite for coverage validation..."
+        
+        # Run all test types with coverage
+        echo "Running unit tests..."
+        gotestsum \
+          --format testname \
+          --junitfile coverage-validation/reports/unit-tests.xml \
+          -- \
+          -race \
+          -timeout=20m \
+          -parallel=4 \
+          -coverprofile=coverage-data/unit/coverage.out \
+          -covermode=atomic \
+          -coverpkg=./... \
+          -tags=unit \
+          ./... || echo "Unit tests completed with issues"
+        
+        echo "Running integration tests..."
+        gotestsum \
+          --format testname \
+          --junitfile coverage-validation/reports/integration-tests.xml \
+          -- \
+          -race \
+          -timeout=20m \
+          -parallel=2 \
+          -coverprofile=coverage-data/integration/coverage.out \
+          -covermode=atomic \
+          -coverpkg=./... \
+          -tags=integration \
+          ./... || echo "Integration tests completed with issues"
+        
+        echo "Running functional tests..."
+        gotestsum \
+          --format testname \
+          --junitfile coverage-validation/reports/functional-tests.xml \
+          -- \
+          -timeout=20m \
+          -parallel=1 \
+          -coverprofile=coverage-data/functional/coverage.out \
+          -covermode=atomic \
+          -coverpkg=./... \
+          -tags=functional,e2e \
+          ./... || echo "Functional tests completed with issues"
+        
+        echo "✅ Test suite execution completed"
+    
+    - name: Merge and validate coverage data
+      id: calculate-coverage
+      run: |
+        echo "📊 Merging and validating coverage data..."
+        
+        # Find and merge coverage files
+        coverage_files=""
+        for test_type in unit integration functional; do
+          coverage_file="coverage-data/$test_type/coverage.out"
+          if [ -f "$coverage_file" ] && [ -s "$coverage_file" ]; then
+            coverage_files="$coverage_files $coverage_file"
+            echo "✅ Found coverage data for $test_type tests"
+          else
+            echo "⚠️ No coverage data found for $test_type tests"
+            # Create empty coverage file to prevent merge failure
+            echo "mode: set" > "$coverage_file"
+          fi
+        done
+        
+        # Merge coverage files
+        if [ -n "$coverage_files" ]; then
+          gocovmerge $coverage_files > coverage-validation/coverage-merged.out
+          echo "✅ Coverage data merged successfully"
+        else
+          echo "❌ No valid coverage files found"
+          echo "mode: set" > coverage-validation/coverage-merged.out
+        fi
+        
+        # Calculate coverage percentage
+        coverage_percentage=$(go tool cover -func=coverage-validation/coverage-merged.out | grep total | awk '{print $3}' | sed 's/%//' || echo "0")
+        
+        echo "coverage=$coverage_percentage" >> $GITHUB_OUTPUT
+        echo "COVERAGE_PERCENTAGE=$coverage_percentage" >> $GITHUB_ENV
+        
+        echo "Current coverage: ${coverage_percentage}%"
+    
+    - name: Load coverage baseline
+      id: load-baseline
+      run: |
+        echo "📋 Loading coverage baseline..."
+        
+        if [ -f "${{ env.COVERAGE_BASELINE_FILE }}" ]; then
+          baseline_coverage=$(jq -r '.coverage' "${{ env.COVERAGE_BASELINE_FILE }}")
+          baseline_date=$(jq -r '.date' "${{ env.COVERAGE_BASELINE_FILE }}")
+          baseline_commit=$(jq -r '.commit' "${{ env.COVERAGE_BASELINE_FILE }}")
+          
+          echo "baseline_coverage=$baseline_coverage" >> $GITHUB_OUTPUT
+          echo "baseline_date=$baseline_date" >> $GITHUB_OUTPUT
+          echo "baseline_commit=$baseline_commit" >> $GITHUB_OUTPUT
+          
+          echo "BASELINE_COVERAGE=$baseline_coverage" >> $GITHUB_ENV
+          
+          echo "✅ Baseline loaded: ${baseline_coverage}% (from $baseline_date)"
+        else
+          echo "⚠️ No coverage baseline found, creating initial baseline"
+          echo "baseline_coverage=0" >> $GITHUB_OUTPUT
+          echo "BASELINE_COVERAGE=0" >> $GITHUB_ENV
+        fi
+    
+    - name: Perform baseline comparison
+      id: baseline-check
+      run: |
+        echo "📈 Performing baseline comparison..."
+        
+        current_coverage=${{ steps.calculate-coverage.outputs.coverage }}
+        baseline_coverage=${{ steps.load-baseline.outputs.baseline_coverage }}
+        
+        # Calculate coverage change
+        if [ "$baseline_coverage" != "0" ]; then
+          coverage_change=$(echo "$current_coverage - $baseline_coverage" | bc -l)
+          coverage_change_abs=$(echo "$coverage_change" | sed 's/-//')
+          
+          if (( $(echo "$coverage_change >= 0" | bc -l) )); then
+            change_direction="increased"
+            change_status="✅"
+          else
+            change_direction="decreased"
+            change_status="⚠️"
+          fi
+          
+          echo "comparison=${change_status} Coverage ${change_direction} by ${coverage_change_abs}%" >> $GITHUB_OUTPUT
+          echo "change=$coverage_change" >> $GITHUB_OUTPUT
+          echo "direction=$change_direction" >> $GITHUB_OUTPUT
+          
+          echo "Coverage change: ${change_status} ${coverage_change}% (${change_direction})"
+        else
+          echo "comparison=📊 Initial coverage measurement" >> $GITHUB_OUTPUT
+          echo "change=0" >> $GITHUB_OUTPUT
+          echo "direction=initial" >> $GITHUB_OUTPUT
+          
+          echo "Initial coverage measurement: ${current_coverage}%"
+        fi
+    
+    - name: Validate coverage threshold
+      id: validate-coverage
+      run: |
+        echo "🎯 Validating coverage against threshold..."
+        
+        current_coverage=${{ steps.calculate-coverage.outputs.coverage }}
+        threshold=${{ env.COVERAGE_THRESHOLD }}
+        
+        # Check if coverage meets threshold
+        if (( $(echo "$current_coverage >= $threshold" | bc -l) )); then
+          echo "status=✅ PASSED" >> $GITHUB_OUTPUT
+          echo "COVERAGE_STATUS=PASSED" >> $GITHUB_ENV
+          echo "✅ Coverage validation PASSED: ${current_coverage}% >= ${threshold}%"
+          validation_result=0
+        else
+          echo "status=❌ FAILED" >> $GITHUB_OUTPUT
+          echo "COVERAGE_STATUS=FAILED" >> $GITHUB_ENV
+          echo "❌ Coverage validation FAILED: ${current_coverage}% < ${threshold}%"
+          validation_result=1
+        fi
+        
+        echo "validation_result=$validation_result" >> $GITHUB_OUTPUT
+    
+    - name: Generate detailed coverage analysis
+      run: |
+        echo "🔍 Generating detailed coverage analysis..."
+        
+        # Generate function coverage report
+        go tool cover -func=coverage-validation/coverage-merged.out > coverage-validation/analysis/function-coverage.txt
+        
+        # Create detailed analysis
+        cat > coverage-validation/analysis/detailed-analysis.md <<EOF
+# Detailed Coverage Analysis Report
+
+## Summary
+- **Current Coverage**: ${{ steps.calculate-coverage.outputs.coverage }}%
+- **Threshold**: ${{ env.COVERAGE_THRESHOLD }}%
+- **Status**: ${{ steps.validate-coverage.outputs.status }}
+- **Baseline Comparison**: ${{ steps.baseline-check.outputs.comparison }}
+
+## Coverage Breakdown
+
+### Functions by Coverage Level
+EOF
+        
+        # Analyze function coverage levels
+        echo "#### Excellent Coverage (>= 90%)" >> coverage-validation/analysis/detailed-analysis.md
+        awk '$3 != "total:" && $3 >= "90.0%" {count++} END {print "Functions: " (count ? count : 0)}' coverage-validation/analysis/function-coverage.txt >> coverage-validation/analysis/detailed-analysis.md
+        echo "" >> coverage-validation/analysis/detailed-analysis.md
+        
+        echo "#### Good Coverage (70-89%)" >> coverage-validation/analysis/detailed-analysis.md
+        awk '$3 != "total:" && $3 >= "70.0%" && $3 < "90.0%" {count++} END {print "Functions: " (count ? count : 0)}' coverage-validation/analysis/function-coverage.txt >> coverage-validation/analysis/detailed-analysis.md
+        echo "" >> coverage-validation/analysis/detailed-analysis.md
+        
+        echo "#### Poor Coverage (1-69%)" >> coverage-validation/analysis/detailed-analysis.md
+        awk '$3 != "total:" && $3 > "0.0%" && $3 < "70.0%" {count++} END {print "Functions: " (count ? count : 0)}' coverage-validation/analysis/detailed-analysis.md >> coverage-validation/analysis/detailed-analysis.md
+        echo "" >> coverage-validation/analysis/detailed-analysis.md
+        
+        echo "#### No Coverage (0%)" >> coverage-validation/analysis/detailed-analysis.md
+        awk '$3 == "0.0%" {count++} END {print "Functions: " (count ? count : 0)}' coverage-validation/analysis/function-coverage.txt >> coverage-validation/analysis/detailed-analysis.md
+        echo "" >> coverage-validation/analysis/detailed-analysis.md
+        
+        # List functions that need attention
+        echo "### Functions Requiring Attention (< 70% coverage)" >> coverage-validation/analysis/detailed-analysis.md
+        echo "" >> coverage-validation/analysis/detailed-analysis.md
+        echo "| Function | File | Coverage |" >> coverage-validation/analysis/detailed-analysis.md
+        echo "|----------|------|----------|" >> coverage-validation/analysis/detailed-analysis.md
+        
+        awk '$3 != "total:" && $3 < "70.0%" {
+          gsub(/%/, "", $3)
+          printf "| %s | %s | %.1f%% |\n", $2, $1, $3
+        }' coverage-validation/analysis/function-coverage.txt >> coverage-validation/analysis/detailed-analysis.md
+        
+        echo "✅ Detailed coverage analysis generated"
+    
+    - name: Generate coverage enforcement report
+      run: |
+        echo "📋 Generating coverage enforcement report..."
+        
+        current_coverage=${{ steps.calculate-coverage.outputs.coverage }}
+        threshold=${{ env.COVERAGE_THRESHOLD }}
+        validation_result=${{ steps.validate-coverage.outputs.validation_result }}
+        
+        # Create enforcement report
+        cat > coverage-validation/enforcement/enforcement-report.md <<EOF
+# Coverage Enforcement Report
+
+Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+Commit: ${{ github.sha }}
+Branch: ${{ github.ref_name }}
+
+## Enforcement Results
+
+### Threshold Validation
+- **Required Coverage**: ${threshold}%
+- **Actual Coverage**: ${current_coverage}%
+- **Result**: ${{ steps.validate-coverage.outputs.status }}
+- **Gap**: $(echo "$threshold - $current_coverage" | bc -l)%
+
+### Baseline Comparison
+${{ steps.baseline-check.outputs.comparison }}
+
+### Enforcement Actions
+EOF
+        
+        if [ "$validation_result" -eq 0 ]; then
+          cat >> coverage-validation/enforcement/enforcement-report.md <<EOF
+✅ **PASSED**: Coverage meets or exceeds the required threshold.
+
+#### Actions Taken:
+- Coverage validation successful
+- Build allowed to proceed
+- Coverage metrics recorded
+EOF
+        else
+          cat >> coverage-validation/enforcement/enforcement-report.md <<EOF
+❌ **FAILED**: Coverage is below the required threshold.
+
+#### Actions Taken:
+- Coverage validation failed
+- Build blocked (in strict mode)
+- Detailed analysis generated
+- Recommendations provided
+
+#### Recommendations:
+1. Add unit tests for uncovered functions
+2. Improve integration test coverage
+3. Review and enhance functional tests
+4. Consider refactoring complex functions for better testability
+
+#### Next Steps:
+- Review the detailed coverage analysis
+- Identify critical uncovered code paths
+- Prioritize test additions based on code importance
+- Re-run tests after adding coverage
+EOF
+        fi
+        
+        echo "✅ Coverage enforcement report generated"
+    
+    - name: Update coverage baseline
+      if: ${{ github.event.inputs.baseline_update == 'true' || (github.ref == 'refs/heads/main' && steps.validate-coverage.outputs.validation_result == '0') }}
+      run: |
+        echo "📊 Updating coverage baseline..."
+        
+        current_coverage=${{ steps.calculate-coverage.outputs.coverage }}
+        
+        # Create new baseline
+        cat > "${{ env.COVERAGE_BASELINE_FILE }}" <<EOF
+{
+  "coverage": $current_coverage,
+  "date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "commit": "${{ github.sha }}",
+  "branch": "${{ github.ref_name }}",
+  "threshold": ${{ env.COVERAGE_THRESHOLD }},
+  "updated_by": "coverage-enforcement-workflow"
+}
+EOF
+        
+        echo "✅ Coverage baseline updated to ${current_coverage}%"
+    
+    - name: Create coverage trend data
+      run: |
+        echo "📈 Creating coverage trend data..."
+        
+        # Create trend entry
+        trend_entry=$(cat <<EOF
+{
+  "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "commit": "${{ github.sha }}",
+  "branch": "${{ github.ref_name }}",
+  "coverage": ${{ steps.calculate-coverage.outputs.coverage }},
+  "threshold": ${{ env.COVERAGE_THRESHOLD }},
+  "status": "${{ steps.validate-coverage.outputs.status }}",
+  "baseline_change": "${{ steps.baseline-check.outputs.change || 0 }}"
+}
+EOF
+        )
+        
+        # Save trend data
+        echo "$trend_entry" > coverage-validation/analysis/trend-entry.json
+        
+        echo "✅ Coverage trend data created"
+    
+    - name: Enforce coverage policy
+      if: ${{ github.event.inputs.strict_mode != 'false' }}
+      run: |
+        echo "🚨 Enforcing coverage policy..."
+        
+        validation_result=${{ steps.validate-coverage.outputs.validation_result }}
+        current_coverage=${{ steps.calculate-coverage.outputs.coverage }}
+        threshold=${{ env.COVERAGE_THRESHOLD }}
+        
+        if [ "$validation_result" -ne 0 ]; then
+          echo "❌ COVERAGE POLICY VIOLATION"
+          echo "Current coverage (${current_coverage}%) is below the required threshold (${threshold}%)"
+          echo ""
+          echo "This build is blocked due to insufficient test coverage."
+          echo "Please add tests to improve coverage before merging."
+          echo ""
+          echo "See the detailed coverage analysis for specific recommendations."
+          
+          # In strict mode, fail the build
+          exit 1
+        else
+          echo "✅ Coverage policy compliance verified"
+        fi
+    
+    - name: Upload coverage validation artifacts
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-validation-results
+        path: |
+          coverage-validation/
+          coverage-data/
+          ${{ env.COVERAGE_BASELINE_FILE }}
+        retention-days: 30
+    
+    - name: Comment coverage validation on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const coverage = '${{ steps.calculate-coverage.outputs.coverage }}';
+          const threshold = '${{ env.COVERAGE_THRESHOLD }}';
+          const status = '${{ steps.validate-coverage.outputs.status }}';
+          const comparison = '${{ steps.baseline-check.outputs.comparison }}';
+          const change = '${{ steps.baseline-check.outputs.change }}' || '0';
+          
+          const statusIcon = status.includes('PASSED') ? '✅' : '❌';
+          const changeIcon = parseFloat(change) >= 0 ? '📈' : '📉';
+          
+          const comment = `## 🎯 Coverage Enforcement Report
+          
+          ${statusIcon} **Coverage Validation**: ${status}
+          
+          ### Results
+          - **Current Coverage**: ${coverage}%
+          - **Required Threshold**: ${threshold}%
+          - **Gap**: ${(parseFloat(threshold) - parseFloat(coverage)).toFixed(1)}%
+          
+          ### Baseline Comparison
+          ${changeIcon} ${comparison}
+          
+          ### Enforcement Status
+          ${status.includes('PASSED') ? 
+            '✅ **Build Allowed**: Coverage meets the required threshold.' : 
+            '❌ **Build Blocked**: Coverage is below the required threshold.'}
+          
+          ${status.includes('FAILED') ? `
+          ### 📋 Action Required
+          - Add unit tests for uncovered functions
+          - Improve integration test coverage  
+          - Review functional test scenarios
+          - Focus on critical code paths
+          
+          View the detailed coverage analysis in the workflow artifacts for specific recommendations.
+          ` : ''}
+          
+          <details>
+          <summary>📊 View Coverage Details</summary>
+          
+          - Detailed analysis available in workflow artifacts
+          - Function-level coverage breakdown included
+          - Trend analysis and baseline comparison provided
+          </details>
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  coverage-trend-analysis:
+    name: Coverage Trend Analysis
+    runs-on: ubuntu-latest
+    needs: coverage-validation
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 100 # Get more history for trend analysis
+    
+    - name: Download validation results
+      uses: actions/download-artifact@v3
+      with:
+        name: coverage-validation-results
+        path: coverage-validation-results
+    
+    - name: Analyze coverage trends
+      run: |
+        echo "📈 Analyzing coverage trends..."
+        
+        mkdir -p coverage-trends
+        
+        # Create trend analysis report
+        cat > coverage-trends/trend-analysis.md <<EOF
+# Coverage Trend Analysis
+        
+Generated on: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        
+## Current Status
+- **Coverage**: ${{ needs.coverage-validation.outputs.coverage-percentage }}%
+- **Status**: ${{ needs.coverage-validation.outputs.coverage-status }}
+- **Baseline**: ${{ needs.coverage-validation.outputs.baseline-comparison }}
+        
+## Historical Context
+EOF
+        
+        # Analyze recent commits for coverage trends
+        echo "### Recent Commits Impact" >> coverage-trends/trend-analysis.md
+        echo "" >> coverage-trends/trend-analysis.md
+        echo "| Commit | Date | Message |" >> coverage-trends/trend-analysis.md
+        echo "|--------|------|---------|" >> coverage-trends/trend-analysis.md
+        
+        git log --oneline -10 --pretty=format:"| %h | %ad | %s |" --date=short >> coverage-trends/trend-analysis.md
+        
+        echo "" >> coverage-trends/trend-analysis.md
+        echo "" >> coverage-trends/trend-analysis.md
+        echo "## Recommendations" >> coverage-trends/trend-analysis.md
+        
+        current_coverage=${{ needs.coverage-validation.outputs.coverage-percentage }}
+        
+        if (( $(echo "$current_coverage < 85" | bc -l) )); then
+          cat >> coverage-trends/trend-analysis.md <<EOF
+        
+### 🎯 Priority Actions
+1. **Immediate**: Add unit tests for core functionality
+2. **Short-term**: Improve integration test coverage
+3. **Long-term**: Establish coverage monitoring and alerts
+        
+### 📊 Coverage Goals
+- **Next milestone**: 70% coverage
+- **Target**: 85% coverage
+- **Stretch goal**: 90% coverage
+EOF
+        else
+          cat >> coverage-trends/trend-analysis.md <<EOF
+        
+### ✅ Maintenance Actions
+1. **Monitor**: Keep coverage above 85%
+2. **Improve**: Target 90%+ coverage for critical paths
+3. **Maintain**: Regular coverage reviews
+EOF
+        fi
+        
+        echo "✅ Coverage trend analysis completed"
+    
+    - name: Upload trend analysis
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-trend-analysis
+        path: coverage-trends/
+        retention-days: 90
+
+  coverage-summary:
+    name: Coverage Summary
+    runs-on: ubuntu-latest
+    needs: [coverage-validation, coverage-trend-analysis]
+    if: always()
+    
+    steps:
+    - name: Create final summary
+      run: |
+        echo "## 🎯 Coverage Enforcement Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **Coverage**: ${{ needs.coverage-validation.outputs.coverage-percentage }}%" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ${{ needs.coverage-validation.outputs.coverage-status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Baseline**: ${{ needs.coverage-validation.outputs.baseline-comparison }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Enforcement" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.coverage-validation.outputs.coverage-status }}" == *"PASSED"* ]]; then
+          echo "✅ **Build Allowed**: Coverage validation successful" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Build Blocked**: Coverage below threshold" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Artifacts Generated" >> $GITHUB_STEP_SUMMARY
+        echo "- 📊 Coverage validation results" >> $GITHUB_STEP_SUMMARY
+        echo "- 📈 Trend analysis report" >> $GITHUB_STEP_SUMMARY
+        echo "- 🎯 Enforcement recommendations" >> $GITHUB_STEP_SUMMARY

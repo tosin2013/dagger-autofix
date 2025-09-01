@@ -4,7 +4,11 @@ A comprehensive Dagger.io agent for automatically resolving GitHub Actions pipel
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org/doc/install)
-[![Dagger](https://img.shields.io/badge/Dagger-0.9+-purple.svg)](https://dagger.io)
+[![Dagger](https://img.shields.io/badge/Dagger-0.11+-purple.svg)](https://dagger.io)
+[![CI](https://github.com/tosin2013/dagger-autofix/workflows/Continuous%20Integration/badge.svg)](https://github.com/tosin2013/dagger-autofix/actions/workflows/ci.yml)
+[![Coverage](https://github.com/tosin2013/dagger-autofix/workflows/Coverage%20Enforcement%20and%20Validation/badge.svg)](https://github.com/tosin2013/dagger-autofix/actions/workflows/coverage-enforcement.yml)
+[![Security](https://github.com/tosin2013/dagger-autofix/workflows/Security%20Analysis/badge.svg)](https://github.com/tosin2013/dagger-autofix/actions/workflows/security-analysis.yml)
+[![Container Security](https://github.com/tosin2013/dagger-autofix/workflows/Container%20Security%20Scanning/badge.svg)](https://github.com/tosin2013/dagger-autofix/actions/workflows/container-security.yml)
 
 ## 🌟 Features
 
@@ -18,6 +22,10 @@ A comprehensive Dagger.io agent for automatically resolving GitHub Actions pipel
 - 💻 **Flexible Interface**: CLI tools, GitHub Actions integration, and Dagger module API
 - 🔒 **Security First**: Secure credential handling, rate limiting, and audit logging
 - 🚀 **Production Ready**: Robust error handling, retry logic, and scalability features
+- 🔄 **CI/CD Pipeline**: Comprehensive GitHub Actions workflows with 85%+ test coverage enforcement
+- 🛡️ **Security Scanning**: Automated vulnerability scanning with gosec, govulncheck, and container security
+- 📦 **Multi-Platform Releases**: Automated releases with cross-platform binaries and container images
+- 🌐 **Daggerverse Integration**: Automated publishing to Daggerverse for easy module distribution
 
 ## 🚀 Quick Start
 
@@ -35,13 +43,13 @@ A comprehensive Dagger.io agent for automatically resolving GitHub Actions pipel
 
 ```bash
 # Use directly from Daggerverse
-dagger -m github.com/your-org/dagger-autofix call \
+dagger -m github.com/tosin2013/dagger-autofix call \
   github-autofix \
   --github-token env:GITHUB_TOKEN \
   --llm-provider openai \
   --llm-api-key env:OPENAI_API_KEY \
-  --repo-owner myorg \
-  --repo-name myrepo \
+  --repo-owner tosin2013 \
+  --repo-name dagger-autofix \
   monitor
 ```
 
@@ -49,7 +57,7 @@ dagger -m github.com/your-org/dagger-autofix call \
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/dagger-autofix.git
+git clone https://github.com/tosin2013/dagger-autofix.git
 cd dagger-autofix
 
 # Initialize configuration from template
@@ -71,7 +79,7 @@ chmod +x ./github-autofix
 docker run -it --rm \
   -e GITHUB_TOKEN=$GITHUB_TOKEN \
   -e OPENAI_API_KEY=$OPENAI_API_KEY \
-  ghcr.io/your-org/dagger-autofix:latest \
+  ghcr.io/tosin2013/dagger-autofix:latest \
   monitor --repo-owner myorg --repo-name myrepo
 ```
 
@@ -360,6 +368,104 @@ notifications:
 # Initialize configuration template
 ./github-autofix config init --format=yaml --output=.github-autofix.yml
 ```
+
+## 🔄 CI/CD Pipeline
+
+This project includes a comprehensive CI/CD pipeline with GitHub Actions that ensures code quality, security, and reliable releases.
+
+### Pipeline Overview
+
+The CI/CD system consists of multiple workflows that run automatically:
+
+#### 🧪 **Continuous Integration** (`.github/workflows/ci.yml`)
+- **Triggers**: Push to main branches, pull requests
+- **Features**:
+  - Go build and test execution with race condition detection
+  - Code linting with golangci-lint
+  - **85% minimum test coverage enforcement**
+  - Integration tests with Dagger CLI
+  - Quality gates that prevent merging on failures
+
+#### 📊 **Coverage Enforcement** (`.github/workflows/coverage-enforcement.yml`)
+- **Triggers**: Push, pull requests, manual dispatch
+- **Features**:
+  - Comprehensive test coverage analysis (unit, integration, functional)
+  - Coverage trend tracking and baseline comparison
+  - Detailed coverage reports with function-level breakdown
+  - **Strict 85% coverage threshold enforcement**
+  - Coverage badge generation and PR comments
+
+#### 🔒 **Security Analysis** (`.github/workflows/security-analysis.yml`)
+- **Triggers**: Push, pull requests, daily scheduled scans
+- **Features**:
+  - Static security analysis with `gosec`
+  - Dependency vulnerability scanning with `govulncheck`
+  - License compliance checking
+  - SARIF report generation for GitHub Security tab
+  - Security gate enforcement (blocks on critical vulnerabilities)
+
+#### 🐳 **Container Security** (`.github/workflows/container-security.yml`)
+- **Triggers**: Dockerfile changes, scheduled scans
+- **Features**:
+  - Docker image vulnerability scanning with Trivy
+  - Multi-platform container security analysis
+  - Filesystem security scanning for misconfigurations
+  - Container security gate enforcement
+
+#### 🚀 **Release Automation** (`.github/workflows/release.yml`)
+- **Triggers**: Git tags (v*), manual dispatch
+- **Features**:
+  - Multi-platform binary builds (Linux, macOS, Windows)
+  - Container image building and publishing to GHCR
+  - Automated GitHub releases with artifacts and checksums
+  - **Daggerverse publishing integration**
+  - Binary signing and security scanning
+
+### Quality Gates
+
+The pipeline enforces strict quality gates:
+
+| Gate | Requirement | Action on Failure |
+|------|-------------|-------------------|
+| **Build** | Must compile successfully | Block merge |
+| **Tests** | All tests must pass | Block merge |
+| **Coverage** | ≥85% test coverage | Block merge |
+| **Security** | No critical vulnerabilities | Block merge |
+| **Linting** | Code style compliance | Block merge |
+
+### Coverage Requirements
+
+- **Minimum Coverage**: 85% across all packages
+- **Coverage Types**: Unit, integration, and functional tests
+- **Enforcement**: Automatic build failure if coverage drops below threshold
+- **Reporting**: Detailed coverage reports with improvement suggestions
+- **Trending**: Coverage trend analysis and baseline tracking
+
+### Security Standards
+
+- **Static Analysis**: gosec security scanning for Go code
+- **Dependency Scanning**: govulncheck for known vulnerabilities
+- **Container Security**: Trivy scanning for container vulnerabilities
+- **License Compliance**: Automated license compatibility checking
+- **SARIF Integration**: Security findings in GitHub Security tab
+
+### Development Workflow
+
+1. **Create Feature Branch**: `git checkout -b feature/your-feature`
+2. **Develop & Test**: Write code with tests to maintain 85%+ coverage
+3. **Push Changes**: `git push origin feature/your-feature`
+4. **Automated Checks**: CI pipeline runs all quality gates
+5. **Code Review**: PR review with automated status checks
+6. **Merge**: Only allowed if all quality gates pass
+7. **Release**: Tag-based releases trigger automated deployment
+
+### Monitoring & Observability
+
+- **Workflow Status**: Real-time status badges in README
+- **Coverage Trends**: Historical coverage tracking
+- **Security Alerts**: Automated vulnerability notifications
+- **Performance Metrics**: Build time and test execution tracking
+- **Artifact Management**: Automated artifact retention and cleanup
 
 ## 🧩 Dagger Usage
 

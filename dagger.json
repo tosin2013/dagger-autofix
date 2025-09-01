@@ -1,0 +1,13 @@
+{
+  "name": "github-autofix",
+  "sdk": "go",
+  "description": "Comprehensive Dagger.io agent for automatically resolving GitHub Actions pipeline failures with multi-LLM support and intelligent fix validation",
+  "source": ".",
+  "version": "1.0.0",
+  "dependencies": [
+    {
+      "name": "container",
+      "source": "dagger"
+    }
+  ]
+}
