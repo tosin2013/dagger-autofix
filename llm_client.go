@@ -361,7 +361,11 @@ func (c *LLMClient) parseOpenAIResponse(resp map[string]interface{}) (*LLMRespon
 
 	choice := choices[0].(map[string]interface{})
 	message := choice["message"].(map[string]interface{})
-	content := message["content"].(string)
+	
+	var content string
+	if contentVal := message["content"]; contentVal != nil {
+		content = contentVal.(string)
+	}
 
 	response := &LLMResponse{
 		Content:      content,
