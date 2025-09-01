@@ -121,8 +121,6 @@ func TestLLMClient_NewLLMClient(t *testing.T) {
 }
 
 // TestLLMClient_ConfigurationMethods tests fluent configuration
-func TestLLMClient_ConfigurationMethods(t *testing.T) {
-	
 	client := &LLMClient{
 		provider:   OpenAI,
 		apiKey:     "test-key",
