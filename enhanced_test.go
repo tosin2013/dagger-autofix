@@ -383,12 +383,16 @@ func TestFrameworkCompatibility(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			framework := engine.getFrameworkByFile(tc.fileName)
-			assert.Equal(t, tc.expectedFramework, framework.Name)
-			
-			// Verify framework has required fields
-			assert.NotEmpty(t, framework.Language)
-			assert.NotEmpty(t, framework.TestCommand)
-			assert.NotNil(t, framework.Environment)
+			if framework != nil {
+				assert.Equal(t, tc.expectedFramework, framework.Name)
+				
+				// Verify framework has required fields
+				assert.NotEmpty(t, framework.Language)
+				assert.NotEmpty(t, framework.TestCommand)
+				assert.NotNil(t, framework.Environment)
+			} else {
+				t.Errorf("getFrameworkByFile returned nil for %s", tc.fileName)
+			}
 		})
 	}
 }
