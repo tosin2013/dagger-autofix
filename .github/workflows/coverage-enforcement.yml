@@ -21,7 +21,7 @@ on:
 env:
   COVERAGE_THRESHOLD: 85
   COVERAGE_BASELINE_FILE: '.github/coverage-baseline.json'
-  GO_VERSION: '1.21'
+  GO_VERSION: '1.24'
 
 jobs:
   coverage-validation:
