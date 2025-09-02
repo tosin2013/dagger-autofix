@@ -670,9 +670,22 @@ func (c *CLI) maskToken(token string) string {
 	if len(token) <= 8 {
 		return "***"
 	}
-	// Preserve provider prefix up to first '-' or '_' when present,
-	// otherwise keep the first four characters. This helps reveal
-	// token type (e.g. "sk-" or "ghp_") while masking the rest.
+
+	// Preserve well known provider prefixes (e.g. "ghp_", "github_pat_" or "sk-")
+	// so the token type remains identifiable while the secret portion stays hidden.
+	knownPrefixes := []string{
+		"github_pat_",
+		"ghp_",
+		"sk-",
+	}
+	for _, p := range knownPrefixes {
+		if strings.HasPrefix(token, p) {
+			return p + "***" + token[len(token)-4:]
+		}
+	}
+
+	// Fallback: preserve prefix up to the first '-' or '_' when it appears
+	// early in the token, otherwise keep the first four characters.
 	prefixEnd := 4
 	if idx := strings.IndexAny(token, "-_"); idx != -1 && idx < 4 {
 		prefixEnd = idx + 1

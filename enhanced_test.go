@@ -102,7 +102,7 @@ func TestErrorScenarios(t *testing.T) {
 		_, err := module.GetMetrics(ctx)
 		assert.Error(t, err, "Expected context timeout error but got nil")
 		if err != nil {
-			assert.Contains(t, strings.ToLower(err.Error()), "context", 
+			assert.Contains(t, strings.ToLower(err.Error()), "context",
 				"Expected context-related error but got: %v", err)
 		}
 	})
@@ -316,6 +316,7 @@ func TestSecurityScenarios(t *testing.T) {
 			{"", "***"},
 			{"short", "***"},
 			{"ghp_1234567890abcdef", "ghp_***cdef"},
+			{"github_pat_1234567890abcdef", "github_pat_***cdef"},
 			{"sk-proj-very-long-token-here", "sk-***here"},
 		}
 
