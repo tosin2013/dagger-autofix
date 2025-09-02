@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"dagger.io/dagger"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,8 +67,8 @@ var mockResponses = map[LLMProvider]string{
 // Mock error responses
 var mockErrorResponses = map[string]string{
 	"invalid_key": `{"error": {"message": "Invalid API key", "type": "invalid_request_error"}}`,
-	"rate_limit": `{"error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}}`,
-	"timeout": `{"error": {"message": "Request timeout", "type": "timeout_error"}}`,
+	"rate_limit":  `{"error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}}`,
+	"timeout":     `{"error": {"message": "Request timeout", "type": "timeout_error"}}`,
 }
 
 // TestLLMClient_NewLLMClient tests client creation
@@ -88,7 +89,7 @@ func TestLLMClient_NewLLMClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			apiKey := createTestSecret("test-key", "test-value")
+			apiKey := (*dagger.Secret)(nil)
 
 			// Mock server for connection test
 			server := createMockServer(t, tt.provider, false)
@@ -121,6 +122,7 @@ func TestLLMClient_NewLLMClient(t *testing.T) {
 }
 
 // TestLLMClient_ConfigurationMethods tests fluent configuration
+func TestLLMClient_ConfigurationMethods(t *testing.T) {
 	client := &LLMClient{
 		provider:   OpenAI,
 		apiKey:     "test-key",
@@ -173,7 +175,7 @@ func TestLLMClient_Chat(t *testing.T) {
 			defer server.Close()
 
 			client := createTestClient(tt.provider, server.URL)
-			
+
 			request := &LLMRequest{
 				Prompt:    "Hello, world!",
 				SystemMsg: "You are a helpful assistant.",
@@ -201,7 +203,7 @@ func TestLLMClient_ChatWithTools(t *testing.T) {
 	defer server.Close()
 
 	client := createTestClient(OpenAI, server.URL)
-	
+
 	tools := []LLMTool{
 		{
 			Name:        "get_weather",
@@ -240,7 +242,7 @@ func TestLLMClient_ErrorHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var server *httptest.Server
-			
+
 			if tt.errorType == "timeout" {
 				// Create a server that doesn't respond quickly
 				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -288,7 +290,7 @@ func TestLLMClient_ResponseParsing(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name:     "Valid Anthropic response", 
+			name:     "Valid Anthropic response",
 			provider: Anthropic,
 			response: mockResponses[Anthropic],
 			wantErr:  false,
@@ -316,7 +318,7 @@ func TestLLMClient_ResponseParsing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := createTestClient(tt.provider, "https://example.com")
-			
+
 			var respData map[string]interface{}
 			err := json.Unmarshal([]byte(tt.response), &respData)
 			require.NoError(t, err)
@@ -365,7 +367,7 @@ func TestLLMClient_MakeRequest(t *testing.T) {
 		{
 			name:     "Valid Anthropic request",
 			provider: Anthropic,
-			method:   "POST", 
+			method:   "POST",
 			path:     "/v1/messages",
 			payload:  map[string]interface{}{"model": "claude-3-5-sonnet"},
 			wantErr:  false,
@@ -386,9 +388,9 @@ func TestLLMClient_MakeRequest(t *testing.T) {
 			defer server.Close()
 
 			client := createTestClient(tt.provider, server.URL)
-			
+
 			result, err := client.makeRequest(context.Background(), tt.method, tt.path, tt.payload)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, result)
@@ -403,7 +405,7 @@ func TestLLMClient_MakeRequest(t *testing.T) {
 // TestLLMClient_DefaultConfigs tests default configuration for all providers
 func TestLLMClient_DefaultConfigs(t *testing.T) {
 	providers := []LLMProvider{OpenAI, Anthropic, Gemini, DeepSeek, LiteLLM}
-	
+
 	for _, provider := range providers {
 		t.Run(string(provider), func(t *testing.T) {
 			config := getDefaultConfig(provider)
@@ -445,7 +447,7 @@ func TestLLMClient_TestConnection(t *testing.T) {
 		defer server.Close()
 
 		client := createTestClient(OpenAI, server.URL)
-		
+
 		err := client.testConnection(context.Background())
 		assert.NoError(t, err)
 	})
@@ -458,7 +460,7 @@ func TestLLMClient_TestConnection(t *testing.T) {
 		defer server.Close()
 
 		client := createTestClient(OpenAI, server.URL)
-		
+
 		err := client.testConnection(context.Background())
 		assert.Error(t, err)
 	})
@@ -482,7 +484,7 @@ func BenchmarkLLMClient_Chat(b *testing.B) {
 
 func BenchmarkLLMClient_ParseResponse(b *testing.B) {
 	client := createTestClient(OpenAI, "https://example.com")
-	
+
 	var respData map[string]interface{}
 	_ = json.Unmarshal([]byte(mockResponses[OpenAI]), &respData)
 
@@ -508,7 +510,7 @@ func createTestClient(provider LLMProvider, baseURL string) *LLMClient {
 func createMockServer(t testing.TB, provider LLMProvider, withError bool) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		if withError {
 			w.WriteHeader(500)
 			w.Write([]byte(`{"error": "Internal server error"}`))
@@ -520,7 +522,7 @@ func createMockServer(t testing.TB, provider LLMProvider, withError bool) *httpt
 		if !exists {
 			response = mockResponses[OpenAI] // Default to OpenAI response
 		}
-		
+
 		w.WriteHeader(200)
 		w.Write([]byte(response))
 	}))
@@ -561,6 +563,7 @@ func createMockServerWithTools(t *testing.T) *httptest.Server {
 		w.Write([]byte(response))
 	}))
 }
+
 // NOTE: Tests use Go testing + testify (assert/require).
 
 // TestLLMClient_MakeRequestHeaders_Extended verifies auth/content-type headers and JSON body presence across providers.
