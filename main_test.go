@@ -309,19 +309,25 @@ func TestTestEngine(t *testing.T) {
 		testCases := []struct {
 			filename string
 			expected string
+			shouldBeNil bool
 		}{
-			{"package.json", "nodejs"},
-			{"go.mod", "golang"},
-			{"pom.xml", "maven"},
-			{"requirements.txt", "python"},
-			{"Cargo.toml", "rust"},
-			{"unknown.txt", "generic"},
+			{"package.json", "nodejs", false},
+			{"go.mod", "golang", false},
+			{"pom.xml", "maven", false},
+			{"requirements.txt", "python", false},
+			{"Cargo.toml", "rust", false},
+			{"unknown.txt", "", true}, // Should be nil for unknown files
 		}
 
 		engine := NewTestEngine(85, logrus.New())
 		for _, tc := range testCases {
 			framework := engine.getFrameworkByFile(tc.filename)
-			assert.Equal(t, tc.expected, framework.Name)
+			if tc.shouldBeNil {
+				assert.Nil(t, framework)
+			} else {
+				assert.NotNil(t, framework)
+				assert.Equal(t, tc.expected, framework.Name)
+			}
 		}
 	})
 
