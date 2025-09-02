@@ -12,6 +12,27 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Interfaces for dependency injection
+type GitHubClient interface {
+	GetWorkflowRun(ctx context.Context, runID int64) (*WorkflowRun, error)
+	GetWorkflowLogs(ctx context.Context, runID int64) (*WorkflowLogs, error)
+	GetFailedWorkflowRuns(ctx context.Context) ([]*WorkflowRun, error)
+	CreateTestBranch(ctx context.Context, branchName string, changes []CodeChange) (func(), error)
+}
+
+type FailureEngine interface {
+	AnalyzeFailure(ctx context.Context, fc FailureContext) (*FailureAnalysisResult, error)
+	GenerateFixes(ctx context.Context, analysis *FailureAnalysisResult) ([]*ProposedFix, error)
+}
+
+type TestRunner interface {
+	RunTests(ctx context.Context, owner, repo, branch string) (*TestResult, error)
+}
+
+type PREngine interface {
+	CreateFixPR(ctx context.Context, analysis *FailureAnalysisResult, fix *FixValidationResult) (*PullRequest, error)
+}
+
 // DaggerAutofix represents the main Dagger module for GitHub Actions auto-fixing
 type DaggerAutofix struct {
 	// Source directory for the project
@@ -28,11 +49,11 @@ type DaggerAutofix struct {
 
 	// Internal state
 	logger        *logrus.Logger
-	githubClient  *GitHubIntegration
+	githubClient  GitHubClient
 	llmClient     *LLMClient
-	failureEngine *FailureAnalysisEngine
-	testEngine    *TestEngine
-	prEngine      *PullRequestEngine
+	failureEngine FailureEngine
+	testEngine    TestRunner
+	prEngine      PREngine
 }
 
 var (
@@ -41,6 +62,7 @@ var (
 	newFailureAnalysisEngine = NewFailureAnalysisEngine
 	newTestEngine            = NewTestEngine
 	newPullRequestEngine     = NewPullRequestEngine
+	newTicker                = time.NewTicker
 )
 
 // New creates a new DaggerAutofix instance with default configuration
@@ -132,7 +154,7 @@ func (m *DaggerAutofix) Initialize(ctx context.Context) (*DaggerAutofix, error) 
 	m.testEngine = newTestEngine(m.MinCoverage, m.logger)
 
 	// Initialize PR engine
-	m.prEngine = newPullRequestEngine(m.githubClient, m.logger)
+	m.prEngine = newPullRequestEngine(ghClient, m.logger)
 
 	m.logger.Info("DaggerAutofix initialized successfully")
 	return m, nil
@@ -146,7 +168,7 @@ func (m *DaggerAutofix) MonitorWorkflows(ctx context.Context) error {
 
 	m.logger.Info("Starting workflow monitoring")
 
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := newTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {
