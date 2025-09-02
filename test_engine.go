@@ -12,10 +12,10 @@ import (
 
 // TestEngine handles automated testing and validation of fixes
 type TestEngine struct {
-	minCoverage     int
-	logger          *logrus.Logger
-	testFrameworks  map[string]*TestFramework
-	coverageTools   map[string]*CoverageTool
+	minCoverage    int
+	logger         *logrus.Logger
+	testFrameworks map[string]*TestFramework
+	coverageTools  map[string]*CoverageTool
 }
 
 // TestFramework defines testing capabilities for a specific language/framework
@@ -33,18 +33,18 @@ type TestFramework struct {
 
 // CoverageTool defines coverage analysis capabilities
 type CoverageTool struct {
-	Name          string   `json:"name"`
-	Languages     []string `json:"languages"`
-	Command       string   `json:"command"`
-	ReportFormats []string `json:"report_formats"`
+	Name          string             `json:"name"`
+	Languages     []string           `json:"languages"`
+	Command       string             `json:"command"`
+	ReportFormats []string           `json:"report_formats"`
 	Thresholds    CoverageThresholds `json:"thresholds"`
 }
 
 // CoverageThresholds defines minimum coverage requirements
 type CoverageThresholds struct {
-	Line     float64 `json:"line"`
-	Branch   float64 `json:"branch"`
-	Function float64 `json:"function"`
+	Line      float64 `json:"line"`
+	Branch    float64 `json:"branch"`
+	Function  float64 `json:"function"`
 	Statement float64 `json:"statement"`
 }
 
@@ -140,11 +140,11 @@ func (e *TestEngine) RunTests(ctx context.Context, owner, repo, branch string) (
 		Duration:     time.Since(start),
 		Output:       testOutput,
 		Details: map[string]interface{}{
-			"framework":      framework.Name,
-			"lint":           lintResult,
-			"build":          buildResult,
+			"framework":       framework.Name,
+			"lint":            lintResult,
+			"build":           buildResult,
 			"coverage_detail": coverageResult,
-			"min_coverage":   e.minCoverage,
+			"min_coverage":    e.minCoverage,
 		},
 	}
 
@@ -209,7 +209,7 @@ func (e *TestEngine) GenerateTestsForFix(ctx context.Context, fix *ProposedFix, 
 func (e *TestEngine) createTestContainer(ctx context.Context, owner, repo, branch string) (*dagger.Container, error) {
 	// Create a container for testing
 	repoURL := fmt.Sprintf("https://github.com/%s/%s", owner, repo)
-	
+
 	container := dag.Container().
 		From("ubuntu:22.04").
 		WithExec([]string{"apt-get", "update"}).
@@ -223,7 +223,7 @@ func (e *TestEngine) createTestContainer(ctx context.Context, owner, repo, branc
 func (e *TestEngine) detectFramework(ctx context.Context, container *dagger.Container) (*TestFramework, error) {
 	// Check for various framework indicators
 	files := []string{"package.json", "go.mod", "pom.xml", "requirements.txt", "Cargo.toml", "composer.json"}
-	
+
 	for _, file := range files {
 		_, err := container.File(file).Contents(ctx)
 		if err == nil {
@@ -390,7 +390,7 @@ func (e *TestEngine) parseCoverageOutput(output string, framework *TestFramework
 
 func (e *TestEngine) generateCodeFixTests(fix *ProposedFix, analysis *FailureAnalysisResult) []string {
 	var tests []string
-	
+
 	// Generate unit tests for changed functions
 	for _, change := range fix.Changes {
 		if change.Operation == "modify" || change.Operation == "add" {
@@ -403,7 +403,7 @@ func Test_%s_Fix(t *testing.T) {
 `, change.FilePath, strings.ReplaceAll(change.FilePath, "/", "_")))
 		}
 	}
-	
+
 	return tests
 }
 
@@ -452,7 +452,7 @@ func TestRegression_` + analysis.ID + `(t *testing.T) {
 func loadTestFrameworks() map[string]*TestFramework {
 	return map[string]*TestFramework{
 		"nodejs": {
-			Name:            "Node.js",
+			Name:            "nodejs",
 			Language:        "javascript",
 			Framework:       "npm",
 			TestCommand:     "npm test",
@@ -465,7 +465,7 @@ func loadTestFrameworks() map[string]*TestFramework {
 			},
 		},
 		"golang": {
-			Name:            "Go",
+			Name:            "golang",
 			Language:        "go",
 			Framework:       "go",
 			TestCommand:     "go test ./...",
@@ -479,7 +479,7 @@ func loadTestFrameworks() map[string]*TestFramework {
 			},
 		},
 		"python": {
-			Name:            "Python",
+			Name:            "python",
 			Language:        "python",
 			Framework:       "pytest",
 			TestCommand:     "pytest",
@@ -492,7 +492,7 @@ func loadTestFrameworks() map[string]*TestFramework {
 			},
 		},
 		"maven": {
-			Name:            "Maven",
+			Name:            "maven",
 			Language:        "java",
 			Framework:       "maven",
 			TestCommand:     "mvn test",
@@ -503,7 +503,7 @@ func loadTestFrameworks() map[string]*TestFramework {
 			Environment:     map[string]string{},
 		},
 		"rust": {
-			Name:            "Rust",
+			Name:            "rust",
 			Language:        "rust",
 			Framework:       "cargo",
 			TestCommand:     "cargo test",
@@ -513,8 +513,19 @@ func loadTestFrameworks() map[string]*TestFramework {
 			ConfigFiles:     []string{"Cargo.toml", "Cargo.lock"},
 			Environment:     map[string]string{},
 		},
+		"php": {
+			Name:            "php",
+			Language:        "php",
+			Framework:       "phpunit",
+			TestCommand:     "./vendor/bin/phpunit",
+			CoverageCommand: "./vendor/bin/phpunit --coverage-xml coverage",
+			BuildCommand:    "composer dump-autoload --optimize",
+			LintCommand:     "./vendor/bin/phpcs",
+			ConfigFiles:     []string{"composer.json"},
+			Environment:     map[string]string{},
+		},
 		"generic": {
-			Name:            "Generic",
+			Name:            "generic",
 			Language:        "unknown",
 			Framework:       "make",
 			TestCommand:     "make test",

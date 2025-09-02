@@ -16,23 +16,23 @@ import (
 type DaggerAutofix struct {
 	// Source directory for the project
 	Source *dagger.Directory
-	
+
 	// Configuration
-	GitHubToken    *dagger.Secret
-	LLMProvider    LLMProvider
-	LLMAPIKey      *dagger.Secret
-	RepoOwner      string
-	RepoName       string
-	TargetBranch   string
-	MinCoverage    int
+	GitHubToken  *dagger.Secret
+	LLMProvider  LLMProvider
+	LLMAPIKey    *dagger.Secret
+	RepoOwner    string
+	RepoName     string
+	TargetBranch string
+	MinCoverage  int
 
 	// Internal state
-	logger         *logrus.Logger
-	githubClient   *GitHubIntegration
-	llmClient      *LLMClient
-	failureEngine  *FailureAnalysisEngine
-	testEngine     *TestEngine
-	prEngine       *PullRequestEngine
+	logger        *logrus.Logger
+	githubClient  *GitHubIntegration
+	llmClient     *LLMClient
+	failureEngine *FailureAnalysisEngine
+	testEngine    *TestEngine
+	prEngine      *PullRequestEngine
 }
 
 // New creates a new DaggerAutofix instance with default configuration
@@ -51,11 +51,11 @@ func New(source ...*dagger.Directory) *DaggerAutofix {
 	}
 
 	return &DaggerAutofix{
-		Source:        sourceDir,
-		LLMProvider:   OpenAI, // default provider
-		TargetBranch:  "main",
-		MinCoverage:   85,
-		logger:        logger,
+		Source:       sourceDir,
+		LLMProvider:  OpenAI, // default provider
+		TargetBranch: "main",
+		MinCoverage:  85,
+		logger:       logger,
 	}
 }
 
@@ -294,12 +294,18 @@ func (m *DaggerAutofix) ValidateFix(ctx context.Context, fix *ProposedFix) (*Fix
 
 // GetMetrics returns operational metrics for monitoring
 func (m *DaggerAutofix) GetMetrics(ctx context.Context) (*OperationalMetrics, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if m.githubClient == nil {
+		return nil, fmt.Errorf("module not initialized")
+	}
 	return &OperationalMetrics{
 		TotalFailuresDetected: 0, // TODO: implement metrics collection
 		SuccessfulFixes:       0,
-		FailedFixes:          0,
-		AverageFixTime:       0,
-		TestCoverage:         float64(m.MinCoverage),
+		FailedFixes:           0,
+		AverageFixTime:        0,
+		TestCoverage:          float64(m.MinCoverage),
 	}, nil
 }
 
@@ -313,7 +319,7 @@ func (m *DaggerAutofix) CLI() (container *dagger.Container) {
 			container = nil
 		}
 	}()
-	
+
 	// This will panic if dag is nil or not properly initialized
 	// which happens when running outside of Dagger context
 	container = dag.Container().
@@ -323,7 +329,7 @@ func (m *DaggerAutofix) CLI() (container *dagger.Container) {
 		WithDirectory("/app", m.Source).
 		WithExec([]string{"go", "mod", "download"}).
 		WithExec([]string{"go", "build", "-o", "github-autofix", "."})
-	
+
 	return container
 }
 
