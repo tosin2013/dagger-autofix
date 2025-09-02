@@ -47,7 +47,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
     
     - name: Detect container configurations
       id: detect
@@ -118,7 +118,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
     
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -255,7 +255,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
     
     - name: Install Trivy
       run: |
@@ -307,7 +307,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
     
     - name: Install Trivy
       run: |
@@ -361,7 +361,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
     
     - name: Download all security reports
       uses: actions/download-artifact@v4
