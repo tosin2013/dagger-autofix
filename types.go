@@ -122,7 +122,7 @@ type FailureAnalysisResult struct {
 	ErrorPatterns  []ErrorPattern        `json:"error_patterns"`
 	Context        FailureContext        `json:"context"`
 	Timestamp      time.Time             `json:"timestamp"`
-	LLMProvider    string                `json:"llm_provider"`
+	LLMProvider    LLMProvider           `json:"llm_provider"`
 	ProcessingTime time.Duration         `json:"processing_time"`
 }
 

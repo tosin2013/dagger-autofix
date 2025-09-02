@@ -94,7 +94,7 @@ func (e *FailureAnalysisEngine) AnalyzeFailure(ctx context.Context, failureCtx F
 	analysis.ID = fmt.Sprintf("analysis-%d-%d", failureCtx.WorkflowRun.ID, time.Now().Unix())
 	analysis.Context = failureCtx
 	analysis.Timestamp = time.Now()
-	analysis.LLMProvider = string(e.llmClient.provider)
+	analysis.LLMProvider = e.llmClient.provider
 	analysis.ProcessingTime = time.Since(start)
 
 	e.logger.WithFields(logrus.Fields{

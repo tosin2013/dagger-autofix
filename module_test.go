@@ -19,7 +19,7 @@ func TestModuleBasics(t *testing.T) {
 		}
 		
 		// Test basic configuration
-		if module.LLMProvider != "openai" {
+		if module.LLMProvider != OpenAI {
 			t.Errorf("Expected default LLM provider to be 'openai', got '%s'", module.LLMProvider)
 		}
 		
