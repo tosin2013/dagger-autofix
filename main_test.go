@@ -14,7 +14,7 @@ func TestDaggerAutofix(t *testing.T) {
 	t.Run("NewDaggerAutofix", func(t *testing.T) {
 		module := New()
 		assert.NotNil(t, module)
-		assert.Equal(t, "openai", module.LLMProvider)
+		assert.Equal(t, LLMProvider("openai"), module.LLMProvider)
 		assert.Equal(t, "main", module.TargetBranch)
 		assert.Equal(t, 85, module.MinCoverage)
 	})
@@ -27,7 +27,7 @@ func TestDaggerAutofix(t *testing.T) {
 			WithTargetBranch("develop").
 			WithMinCoverage(90)
 
-		assert.Equal(t, "anthropic", module.LLMProvider)
+		assert.Equal(t, LLMProvider("anthropic"), module.LLMProvider)
 		assert.Equal(t, "owner", module.RepoOwner)
 		assert.Equal(t, "repo", module.RepoName)
 		assert.Equal(t, "develop", module.TargetBranch)
@@ -36,7 +36,7 @@ func TestDaggerAutofix(t *testing.T) {
 
 	t.Run("ValidateConfiguration", func(t *testing.T) {
 		module := New()
-		
+
 		// Missing required fields
 		err := module.validateConfiguration()
 		assert.Error(t, err)
@@ -47,7 +47,7 @@ func TestDaggerAutofix(t *testing.T) {
 		module.LLMAPIKey = createTestSecret("llm-key", "test-key")
 		module.RepoOwner = "owner"
 		module.RepoName = "repo"
-		
+
 		err = module.validateConfiguration()
 		assert.NoError(t, err)
 	})
@@ -104,7 +104,7 @@ func TestLLMClient(t *testing.T) {
 	t.Run("NewLLMClient", func(t *testing.T) {
 		ctx := context.Background()
 		apiKey := createTestSecret("test-key", "test-value")
-		
+
 		// This would fail in real testing without valid API key
 		_, err := NewLLMClient(ctx, OpenAI, apiKey)
 		if err != nil {
@@ -376,9 +376,9 @@ func TestOperationalMetrics(t *testing.T) {
 		metrics := &OperationalMetrics{
 			TotalFailuresDetected: 10,
 			SuccessfulFixes:       8,
-			FailedFixes:          2,
-			AverageFixTime:       5 * time.Minute,
-			TestCoverage:         85.5,
+			FailedFixes:           2,
+			AverageFixTime:        5 * time.Minute,
+			TestCoverage:          85.5,
 			LLMProviderStats: map[string]int{
 				"openai":    5,
 				"anthropic": 3,

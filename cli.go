@@ -5,32 +5,33 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
-	"github.com/spf13/cobra"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 // CLI represents the command-line interface for the GitHub Auto-Fix Agent
 type CLI struct {
-	logger *logrus.Logger
+	logger  *logrus.Logger
 	rootCmd *cobra.Command
 }
 
 // CLIConfig holds CLI configuration
 type CLIConfig struct {
-	GitHubToken   string `json:"github_token"`
-	LLMProvider   string `json:"llm_provider"`
-	LLMAPIKey     string `json:"llm_api_key"`
-	RepoOwner     string `json:"repo_owner"`
-	RepoName      string `json:"repo_name"`
-	TargetBranch  string `json:"target_branch"`
-	MinCoverage   int    `json:"min_coverage"`
-	ConfigFile    string `json:"config_file"`
-	Verbose       bool   `json:"verbose"`
-	DryRun        bool   `json:"dry_run"`
-	LogLevel      string `json:"log_level"`
-	LogFormat     string `json:"log_format"`
+	GitHubToken  string `json:"github_token"`
+	LLMProvider  string `json:"llm_provider"`
+	LLMAPIKey    string `json:"llm_api_key"`
+	RepoOwner    string `json:"repo_owner"`
+	RepoName     string `json:"repo_name"`
+	TargetBranch string `json:"target_branch"`
+	MinCoverage  int    `json:"min_coverage"`
+	ConfigFile   string `json:"config_file"`
+	Verbose      bool   `json:"verbose"`
+	DryRun       bool   `json:"dry_run"`
+	LogLevel     string `json:"log_level"`
+	LogFormat    string `json:"log_format"`
 }
 
 // NewCLI creates a new CLI instance
@@ -645,7 +646,14 @@ func (c *CLI) maskToken(token string) string {
 	if len(token) <= 8 {
 		return "***"
 	}
-	return token[:4] + "***" + token[len(token)-4:]
+	// Preserve provider prefix up to first '-' or '_' when present,
+	// otherwise keep the first four characters. This helps reveal
+	// token type (e.g. "sk-" or "ghp_") while masking the rest.
+	prefixEnd := 4
+	if idx := strings.IndexAny(token, "-_"); idx != -1 && idx < 4 {
+		prefixEnd = idx + 1
+	}
+	return token[:prefixEnd] + "***" + token[len(token)-4:]
 }
 
 // Main entry point for CLI
