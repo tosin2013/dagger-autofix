@@ -449,24 +449,30 @@ func (c *CLI) getCurrentConfig(cmd *cobra.Command) *CLIConfig {
 	config.TargetBranch = c.getStringValue(cmd, "target-branch", "TARGET_BRANCH")
 	config.MinCoverage = c.getIntValue(cmd, "min-coverage", "MIN_COVERAGE")
 
-	config.Verbose, _ = cmd.PersistentFlags().GetBool("verbose")
-	config.DryRun, _ = cmd.PersistentFlags().GetBool("dry-run")
-	config.LogLevel, _ = cmd.PersistentFlags().GetString("log-level")
-	config.LogFormat, _ = cmd.PersistentFlags().GetString("log-format")
+	config.Verbose = c.getBoolValue(cmd, "verbose", "VERBOSE")
+	config.DryRun = c.getBoolValue(cmd, "dry-run", "DRY_RUN")
+	config.LogLevel = c.getStringValue(cmd, "log-level", "LOG_LEVEL")
+	config.LogFormat = c.getStringValue(cmd, "log-format", "LOG_FORMAT")
 	config.ConfigFile, _ = cmd.PersistentFlags().GetString("config")
 
 	return config
 }
 
 func (c *CLI) getStringValue(cmd *cobra.Command, flagName, envName string) string {
-	if val, _ := cmd.PersistentFlags().GetString(flagName); val != "" {
+	if cmd.Flags().Changed(flagName) {
+		val, _ := cmd.PersistentFlags().GetString(flagName)
 		return val
 	}
-	return os.Getenv(envName)
+	if envVal := os.Getenv(envName); envVal != "" {
+		return envVal
+	}
+	val, _ := cmd.PersistentFlags().GetString(flagName)
+	return val
 }
 
 func (c *CLI) getIntValue(cmd *cobra.Command, flagName, envName string) int {
-	if val, _ := cmd.PersistentFlags().GetInt(flagName); val != 0 {
+	if cmd.Flags().Changed(flagName) {
+		val, _ := cmd.PersistentFlags().GetInt(flagName)
 		return val
 	}
 	if envVal := os.Getenv(envName); envVal != "" {
@@ -474,7 +480,25 @@ func (c *CLI) getIntValue(cmd *cobra.Command, flagName, envName string) int {
 			return intVal
 		}
 	}
+	val, _ := cmd.PersistentFlags().GetInt(flagName)
+	if val != 0 {
+		return val
+	}
 	return 85 // default
+}
+
+func (c *CLI) getBoolValue(cmd *cobra.Command, flagName, envName string) bool {
+	if cmd.Flags().Changed(flagName) {
+		val, _ := cmd.PersistentFlags().GetBool(flagName)
+		return val
+	}
+	if envVal := os.Getenv(envName); envVal != "" {
+		if boolVal, err := strconv.ParseBool(envVal); err == nil {
+			return boolVal
+		}
+	}
+	val, _ := cmd.PersistentFlags().GetBool(flagName)
+	return val
 }
 
 func (c *CLI) createDefaultConfig(filename string) error {
