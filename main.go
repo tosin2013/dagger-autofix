@@ -54,6 +54,7 @@ type DaggerAutofix struct {
 	failureEngine FailureEngine
 	testEngine    TestRunner
 	prEngine      PREngine
+	processedRuns map[int64]struct{}
 }
 
 var (
@@ -81,11 +82,12 @@ func New(source ...*dagger.Directory) *DaggerAutofix {
 	}
 
 	return &DaggerAutofix{
-		Source:       sourceDir,
-		LLMProvider:  OpenAI, // default provider
-		TargetBranch: "main",
-		MinCoverage:  85,
-		logger:       logger,
+		Source:        sourceDir,
+		LLMProvider:   OpenAI, // default provider
+		TargetBranch:  "main",
+		MinCoverage:   85,
+		logger:        logger,
+		processedRuns: make(map[int64]struct{}),
 	}
 }
 
@@ -407,10 +409,27 @@ func (m *DaggerAutofix) checkForFailures(ctx context.Context) error {
 }
 
 func (m *DaggerAutofix) shouldProcessRun(run *WorkflowRun) bool {
-	// Skip if already processed
-	// Skip if too old
-	// Skip if manual trigger
-	return true // Simplified for now
+	if run == nil {
+		return false
+	}
+
+	if _, exists := m.processedRuns[run.ID]; exists {
+		m.logger.WithField("run_id", run.ID).Debug("run already processed")
+		return false
+	}
+
+	if time.Since(run.CreatedAt) > 24*time.Hour {
+		m.logger.WithField("run_id", run.ID).Debug("run too old")
+		return false
+	}
+
+	if strings.EqualFold(run.Event, "workflow_dispatch") {
+		m.logger.WithField("run_id", run.ID).Debug("manual run skipped")
+		return false
+	}
+
+	m.processedRuns[run.ID] = struct{}{}
+	return true
 }
 
 func (m *DaggerAutofix) selectBestFix(validations []*FixValidationResult) *FixValidationResult {
