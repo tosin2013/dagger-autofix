@@ -511,7 +511,7 @@ jobs:
         fetch-depth: 100 # Get more history for trend analysis
     
     - name: Download validation results
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: coverage-validation-results
         path: coverage-validation-results
