@@ -12,7 +12,7 @@ import (
 
 // FailureAnalysisEngine analyzes CI/CD failures using LLM-powered intelligence
 type FailureAnalysisEngine struct {
-	llmClient *LLMClient
+	llmClient LLMClientInterface
 	logger    *logrus.Logger
 	patterns  *ErrorPatternDatabase
 	prompts   *PromptTemplates
@@ -45,7 +45,7 @@ type PromptTemplates struct {
 }
 
 // NewFailureAnalysisEngine creates a new failure analysis engine
-func NewFailureAnalysisEngine(llmClient *LLMClient, logger *logrus.Logger) *FailureAnalysisEngine {
+func NewFailureAnalysisEngine(llmClient LLMClientInterface, logger *logrus.Logger) *FailureAnalysisEngine {
 	return &FailureAnalysisEngine{
 		llmClient: llmClient,
 		logger:    logger,
@@ -94,7 +94,14 @@ func (e *FailureAnalysisEngine) AnalyzeFailure(ctx context.Context, failureCtx F
 	analysis.ID = fmt.Sprintf("analysis-%d-%d", failureCtx.WorkflowRun.ID, time.Now().Unix())
 	analysis.Context = failureCtx
 	analysis.Timestamp = time.Now()
-	analysis.LLMProvider = e.llmClient.provider
+	
+	// Set LLM provider if available
+	if realClient, ok := e.llmClient.(*LLMClient); ok {
+		analysis.LLMProvider = realClient.provider
+	} else {
+		analysis.LLMProvider = "mock" // For testing
+	}
+	
 	analysis.ProcessingTime = time.Since(start)
 
 	e.logger.WithFields(logrus.Fields{
@@ -231,7 +238,11 @@ func (e *FailureAnalysisEngine) buildAnalysisPrompt(ctx FailureContext, preClass
 			if i >= 3 {
 				break // Limit to 3 recent commits
 			}
-			prompt.WriteString(fmt.Sprintf("**Commit %s**: %s (by %s)\n", commit.SHA[:8], commit.Message, commit.Author))
+			shaShort := commit.SHA
+			if len(shaShort) > 8 {
+				shaShort = shaShort[:8]
+			}
+			prompt.WriteString(fmt.Sprintf("**Commit %s**: %s (by %s)\n", shaShort, commit.Message, commit.Author))
 			for _, change := range commit.Changes {
 				prompt.WriteString(fmt.Sprintf("  - %s: %s (+%d/-%d)\n", change.Status, change.Filename, change.Additions, change.Deletions))
 			}

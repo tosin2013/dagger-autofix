@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -409,44 +410,301 @@ func TestAddValidationSteps(t *testing.T) {
 	assert.Greater(t, len(fix.Validation), 0)
 }
 
-// Integration test for the full analysis workflow
-func TestAnalyzeFailureIntegration(t *testing.T) {
-	t.Skip("Skipping integration test - requires actual LLM client")
+// Mock LLM client for testing
+type mockLLMClient struct {
+	response *LLMResponse
+	err      error
+	provider LLMProvider
+}
 
+func (m *mockLLMClient) Chat(ctx context.Context, req *LLMRequest) (*LLMResponse, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.response, nil
+}
+
+// TestAnalyzeFailure tests the AnalyzeFailure method with mock LLM client
+func TestAnalyzeFailure(t *testing.T) {
 	logger := logrus.New()
 	
-	// This would require a real LLM client for integration testing
-	// Skipping for unit tests but showing the structure
-	ctx := context.Background()
-	
-	failureCtx := FailureContext{
-		WorkflowRun: &WorkflowRun{
-			ID:     123,
-			Status: "failed",
-		},
-		Repository: RepositoryContext{
-			Name:     "test-repo",
-			Language: "Go",
-		},
-		Logs: &WorkflowLogs{
-			ErrorLines: []string{
-				"go build failed",
-				"missing dependency",
+	tests := []struct {
+		name        string
+		mockResp    *LLMResponse
+		mockErr     error
+		expectError bool
+	}{
+		{
+			name: "Successful analysis with structured JSON response",
+			mockResp: &LLMResponse{
+				Content: `{
+					"root_cause": "Missing dependency in package.json",
+					"description": "The build failed because lodash package is not installed",
+					"classification": {
+						"type": "dependency_failure",
+						"severity": "high",
+						"category": "systematic",
+						"confidence": 0.9,
+						"tags": ["npm", "dependency"]
+					},
+					"affected_files": ["package.json", "src/utils.js"],
+					"error_patterns": [
+						{
+							"pattern": "Cannot resolve module 'lodash'",
+							"description": "Missing npm dependency",
+							"confidence": 0.9,
+							"location": "line 5 in src/utils.js"
+						}
+					]
+				}`,
+				Provider: "openai",
+				Model:    "gpt-4",
 			},
+			expectError: false,
+		},
+		{
+			name: "Successful analysis with unstructured response",
+			mockResp: &LLMResponse{
+				Content: `The build failure is caused by a missing dependency. The package.json file is missing the lodash package which is required by src/utils.js. This is a systematic dependency failure that should be easy to fix by adding the package to dependencies.`,
+				Provider: "anthropic",
+				Model:    "claude-3",
+			},
+			expectError: false,
+		},
+		{
+			name:        "LLM client error",
+			mockResp:    nil,
+			mockErr:     fmt.Errorf("API rate limit exceeded"),
+			expectError: true,
 		},
 	}
 
-	// This test would need a mock LLM client
-	engine := NewFailureAnalysisEngine(nil, logger)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockLLM := &mockLLMClient{
+				response: tt.mockResp,
+				err:      tt.mockErr,
+				provider: OpenAI,
+			}
+
+			// Create engine with mock LLM client
+			engine := &FailureAnalysisEngine{
+				llmClient: mockLLM,
+				logger:    logger,
+				patterns:  loadErrorPatterns(),
+				prompts:   loadPromptTemplates(),
+			}
+
+			ctx := context.Background()
+			failureCtx := FailureContext{
+				WorkflowRun: &WorkflowRun{
+					ID:         123,
+					Name:       "CI/CD Pipeline",
+					Status:     "failed",
+					Conclusion: "failure",
+					Branch:     "main",
+					CommitSHA:  "abc123",
+				},
+				Repository: RepositoryContext{
+					Owner:     "test-owner",
+					Name:      "test-repo",
+					Language:  "JavaScript",
+					Framework: "Node.js",
+				},
+				Logs: &WorkflowLogs{
+					ErrorLines: []string{
+						"npm ERR! Cannot resolve dependency 'lodash'",
+						"Build failed with exit code 1",
+					},
+					RawLogs: "npm install failed\nCannot resolve module 'lodash'\nBuild terminated",
+				},
+				RecentCommits: []CommitInfo{
+					{
+						SHA:     "abc12345", // Make sure it's at least 8 characters
+						Message: "Add new utility function",
+						Author:  "test-author",
+						Changes: []FileChange{
+							{
+								Filename:  "src/utils.js",
+								Status:    "modified",
+								Additions: 10,
+								Deletions: 2,
+							},
+						},
+					},
+				},
+			}
+
+			result, err := engine.AnalyzeFailure(ctx, failureCtx)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.NotEmpty(t, result.ID)
+				assert.NotEmpty(t, result.RootCause)
+				assert.NotEmpty(t, result.Description)
+				assert.Equal(t, failureCtx, result.Context)
+				assert.NotZero(t, result.Timestamp)
+				assert.NotZero(t, result.ProcessingTime)
+				
+				// Verify classification
+				assert.NotEmpty(t, result.Classification.Type)
+				assert.Greater(t, result.Classification.Confidence, 0.0)
+				assert.LessOrEqual(t, result.Classification.Confidence, 1.0)
+			}
+		})
+	}
+}
+
+// TestGenerateFixes tests the GenerateFixes method with mock LLM client
+func TestGenerateFixes(t *testing.T) {
+	logger := logrus.New()
 	
-	// The actual test would call:
-	// result, err := engine.AnalyzeFailure(ctx, failureCtx)
-	// assert.NoError(t, err)
-	// assert.NotNil(t, result)
-	
-	_ = ctx
-	_ = failureCtx
-	_ = engine
+	tests := []struct {
+		name         string
+		mockResp     *LLMResponse
+		mockErr      error
+		expectError  bool
+		expectedFixes int
+	}{
+		{
+			name: "Successful fix generation with structured JSON response",
+			mockResp: &LLMResponse{
+				Content: `[
+					{
+						"type": "dependency_fix",
+						"description": "Add missing lodash dependency to package.json",
+						"rationale": "The error indicates lodash module cannot be resolved, adding it as a dependency will fix the issue",
+						"confidence": 0.9,
+						"risks": ["None - lodash is a stable, widely-used library"],
+						"benefits": ["Resolves build failure", "Enables utility functions to work"],
+						"changes": [
+							{
+								"file_path": "package.json",
+								"operation": "modify",
+								"old_content": "\"dependencies\": {}",
+								"new_content": "\"dependencies\": {\n  \"lodash\": \"^4.17.21\"\n}",
+								"explanation": "Add lodash dependency to package.json"
+							}
+						]
+					},
+					{
+						"type": "code_fix",
+						"description": "Use native JavaScript instead of lodash",
+						"rationale": "Alternative fix to avoid adding external dependency",
+						"confidence": 0.7,
+						"risks": ["May require more code changes", "Less optimized than lodash"],
+						"benefits": ["No external dependency", "Smaller bundle size"],
+						"changes": [
+							{
+								"file_path": "src/utils.js",
+								"operation": "modify",
+								"old_content": "const _ = require('lodash');",
+								"new_content": "// Using native JavaScript methods",
+								"explanation": "Replace lodash with native implementation"
+							}
+						]
+					}
+				]`,
+				Provider: "openai",
+				Model:    "gpt-4",
+			},
+			expectError:   false,
+			expectedFixes: 2,
+		},
+		{
+			name: "Successful fix generation with unstructured response",
+			mockResp: &LLMResponse{
+				Content: `Fix 1: Add the missing lodash dependency to package.json by running npm install lodash
+Fix 2: Replace lodash usage with native JavaScript methods
+Fix 3: Check if lodash is actually needed or can be removed`,
+				Provider: "anthropic",
+				Model:    "claude-3",
+			},
+			expectError:   false,
+			expectedFixes: 1, // Unstructured response creates single fix
+		},
+		{
+			name:          "LLM client error",
+			mockResp:      nil,
+			mockErr:       fmt.Errorf("API timeout"),
+			expectError:   true,
+			expectedFixes: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockLLM := &mockLLMClient{
+				response: tt.mockResp,
+				err:      tt.mockErr,
+				provider: OpenAI,
+			}
+
+			// Create engine with mock LLM client
+			engine := &FailureAnalysisEngine{
+				llmClient: mockLLM,
+				logger:    logger,
+				patterns:  loadErrorPatterns(),
+				prompts:   loadPromptTemplates(),
+			}
+
+			// Create analysis result for input
+			analysis := &FailureAnalysisResult{
+				ID:          "test-analysis-123",
+				RootCause:   "Missing lodash dependency",
+				Description: "Build failed because lodash package is not installed",
+				Classification: FailureClassification{
+					Type:       DependencyFailure,
+					Severity:   High,
+					Category:   Systematic,
+					Confidence: 0.9,
+					Tags:       []string{"npm", "dependency"},
+				},
+				AffectedFiles: []string{"package.json", "src/utils.js"},
+				ErrorPatterns: []ErrorPattern{
+					{
+						Pattern:     "Cannot resolve module 'lodash'",
+						Description: "Missing npm dependency",
+						Confidence:  0.9,
+						Location:    "src/utils.js:5",
+					},
+				},
+				Context: FailureContext{
+					Repository: RepositoryContext{
+						Owner:     "test-owner",
+						Name:      "test-repo",
+						Language:  "JavaScript",
+						Framework: "Node.js",
+					},
+				},
+			}
+
+			ctx := context.Background()
+			fixes, err := engine.GenerateFixes(ctx, analysis)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, fixes)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, fixes, tt.expectedFixes)
+				
+				for _, fix := range fixes {
+					assert.NotEmpty(t, fix.ID)
+					assert.NotEmpty(t, fix.Description)
+					assert.NotEmpty(t, fix.Type)
+					assert.Greater(t, fix.Confidence, 0.0)
+					assert.LessOrEqual(t, fix.Confidence, 1.0)
+					assert.NotZero(t, fix.Timestamp)
+					assert.NotEmpty(t, fix.Validation) // Should have validation steps added
+				}
+			}
+		})
+	}
 }
 
 // Test helper functions

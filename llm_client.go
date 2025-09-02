@@ -14,6 +14,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// LLMClientInterface defines the interface for LLM clients
+type LLMClientInterface interface {
+	Chat(ctx context.Context, req *LLMRequest) (*LLMResponse, error)
+}
+
 // LLMProvider represents different LLM providers
 type LLMProvider string
 
