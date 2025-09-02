@@ -35,6 +35,14 @@ type DaggerAutofix struct {
 	prEngine      *PullRequestEngine
 }
 
+var (
+	newGitHubIntegration     = NewGitHubIntegration
+	newLLMClient             = NewLLMClient
+	newFailureAnalysisEngine = NewFailureAnalysisEngine
+	newTestEngine            = NewTestEngine
+	newPullRequestEngine     = NewPullRequestEngine
+)
+
 // New creates a new DaggerAutofix instance with default configuration
 // Optionally accepts a source directory; if none provided, uses current directory
 func New(source ...*dagger.Directory) *DaggerAutofix {
@@ -104,27 +112,27 @@ func (m *DaggerAutofix) Initialize(ctx context.Context) (*DaggerAutofix, error) 
 	}
 
 	// Initialize GitHub client
-	ghClient, err := NewGitHubIntegration(ctx, m.GitHubToken, m.RepoOwner, m.RepoName)
+	ghClient, err := newGitHubIntegration(ctx, m.GitHubToken, m.RepoOwner, m.RepoName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 	m.githubClient = ghClient
 
 	// Initialize LLM client
-	llmClient, err := NewLLMClient(ctx, m.LLMProvider, m.LLMAPIKey)
+	llmClient, err := newLLMClient(ctx, m.LLMProvider, m.LLMAPIKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize LLM client: %w", err)
 	}
 	m.llmClient = llmClient
 
 	// Initialize failure analysis engine
-	m.failureEngine = NewFailureAnalysisEngine(m.llmClient, m.logger)
+	m.failureEngine = newFailureAnalysisEngine(m.llmClient, m.logger)
 
 	// Initialize test engine
-	m.testEngine = NewTestEngine(m.MinCoverage, m.logger)
+	m.testEngine = newTestEngine(m.MinCoverage, m.logger)
 
 	// Initialize PR engine
-	m.prEngine = NewPullRequestEngine(m.githubClient, m.logger)
+	m.prEngine = newPullRequestEngine(m.githubClient, m.logger)
 
 	m.logger.Info("DaggerAutofix initialized successfully")
 	return m, nil
