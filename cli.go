@@ -67,8 +67,8 @@ generates and validates fixes, and creates pull requests automatically.
 Supports multiple LLM providers: OpenAI, Anthropic, Gemini, DeepSeek, and LiteLLM proxy.`,
 		Version: "1.0.0",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			c.setupLogging()
 			c.loadConfiguration()
+			c.setupLogging()
 		},
 	}
 
@@ -379,22 +379,20 @@ func (c *CLI) runTestLLM(cmd *cobra.Command, args []string) error {
 // Helper methods
 
 func (c *CLI) setupLogging() {
-	verbose, _ := c.rootCmd.PersistentFlags().GetBool("verbose")
-	logLevel, _ := c.rootCmd.PersistentFlags().GetString("log-level")
-	logFormat, _ := c.rootCmd.PersistentFlags().GetString("log-format")
+	cfg := c.getCurrentConfig(c.rootCmd)
 
 	// Set log level
-	level, err := logrus.ParseLevel(logLevel)
+	level, err := logrus.ParseLevel(cfg.LogLevel)
 	if err != nil {
 		level = logrus.InfoLevel
 	}
-	if verbose {
+	if cfg.Verbose {
 		level = logrus.DebugLevel
 	}
 	c.logger.SetLevel(level)
 
 	// Set log format
-	switch logFormat {
+	switch cfg.LogFormat {
 	case "text":
 		c.logger.SetFormatter(&logrus.TextFormatter{})
 	default:

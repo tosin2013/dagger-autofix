@@ -58,6 +58,8 @@ RATE_LIMIT_BUFFER=20
 LOG_LEVEL=info
 LOG_FORMAT=json
 LOG_FILE=/var/log/github-autofix.log
+# Settings from this file are loaded before the CLI initializes,
+# so log level and format take effect for startup messages.
 
 # === NOTIFICATIONS ===
 WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/url
