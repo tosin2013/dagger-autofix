@@ -1,0 +1,12 @@
+# Go build and coverage artifacts
+/github-autofix
+*.out
+coverage.out
+
+# Log files
+*.log
+
+# Backup and temporary files
+*.bak*
+*.final*
+
