@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,4 +35,20 @@ func TestCLIConfigEnvVars(t *testing.T) {
 	assert.Equal(t, "text", cfg.LogFormat)
 	assert.True(t, cfg.DryRun)
 	assert.True(t, cfg.Verbose)
+}
+
+func TestSetupLoggingUsesEnvVars(t *testing.T) {
+	os.Setenv("LOG_LEVEL", "debug")
+	os.Setenv("LOG_FORMAT", "text")
+	defer func() {
+		os.Unsetenv("LOG_LEVEL")
+		os.Unsetenv("LOG_FORMAT")
+	}()
+
+	cli := NewCLI()
+	cli.setupLogging()
+
+	assert.Equal(t, logrus.DebugLevel, cli.logger.GetLevel())
+	_, ok := cli.logger.Formatter.(*logrus.TextFormatter)
+	assert.True(t, ok)
 }
