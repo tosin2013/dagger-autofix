@@ -253,7 +253,7 @@ func TestLLMClient_ErrorHandling(t *testing.T) {
 				server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(tt.statusCode)
-					w.Write([]byte(mockErrorResponses[tt.errorType]))
+					_, _ = w.Write([]byte(mockErrorResponses[tt.errorType]))
 				}))
 			}
 			defer server.Close()
@@ -455,7 +455,7 @@ func TestLLMClient_TestConnection(t *testing.T) {
 	t.Run("Failed connection", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(500)
-			w.Write([]byte("Internal Server Error"))
+			_, _ = w.Write([]byte("Internal Server Error"))
 		}))
 		defer server.Close()
 
@@ -513,7 +513,7 @@ func createMockServer(t testing.TB, provider LLMProvider, withError bool) *httpt
 
 		if withError {
 			w.WriteHeader(500)
-			w.Write([]byte(`{"error": "Internal server error"}`))
+			_, _ = w.Write([]byte(`{"error": "Internal server error"}`))
 			return
 		}
 
@@ -524,7 +524,7 @@ func createMockServer(t testing.TB, provider LLMProvider, withError bool) *httpt
 		}
 
 		w.WriteHeader(200)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 }
 
@@ -560,7 +560,7 @@ func createMockServerWithTools(t *testing.T) *httptest.Server {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 }
 
@@ -569,12 +569,12 @@ func createMockServerWithTools(t *testing.T) *httptest.Server {
 // TestLLMClient_MakeRequestHeaders_Extended verifies auth/content-type headers and JSON body presence across providers.
 func TestLLMClient_MakeRequestHeaders_Extended(t *testing.T) {
 	type seen struct {
-		Method   string
-		Auth     string
-		APIKey   string
-		GoogKey  string
-		CT       string
-		BodyMap  map[string]any
+		Method  string
+		Auth    string
+		APIKey  string
+		GoogKey string
+		CT      string
+		BodyMap map[string]any
 	}
 	cases := []struct {
 		name     string
