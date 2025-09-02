@@ -53,6 +53,175 @@ func TestDaggerAutofix(t *testing.T) {
 	})
 }
 
+// TestWithSource tests the WithSource method
+func TestWithSource(t *testing.T) {
+	module := New()
+	
+	// Test with nil source (should not panic)
+	result := module.WithSource(nil)
+	assert.NotNil(t, result)
+	assert.Nil(t, result.Source)
+	
+	// Test with mock directory (we can't create real dagger.Directory in tests)
+	// This mainly tests that the method works and returns the module
+	result2 := module.WithSource(nil) // Using nil as we can't create real dagger objects
+	assert.NotNil(t, result2)
+	assert.Equal(t, module, result2) // Should return same instance for chaining
+}
+
+// TestValidateConfigurationCases tests various validation scenarios
+func TestValidateConfigurationCases(t *testing.T) {
+	tests := []struct {
+		name          string
+		setupModule   func() *DaggerAutofix
+		expectedError string
+	}{
+		{
+			name: "Missing GitHub token",
+			setupModule: func() *DaggerAutofix {
+				return New()
+			},
+			expectedError: "GitHub token is required",
+		},
+		{
+			name: "Missing repository info", 
+			setupModule: func() *DaggerAutofix {
+				module := New()
+				module.GitHubToken = createTestSecret("github-token", "test-token")
+				return module
+			},
+			expectedError: "repository owner and name are required",
+		},
+		{
+			name: "Missing LLM API key",
+			setupModule: func() *DaggerAutofix {
+				module := New()
+				module.GitHubToken = createTestSecret("github-token", "test-token")
+				module.RepoOwner = "owner"
+				module.RepoName = "repo"
+				return module
+			},
+			expectedError: "LLM API key is required",
+		},
+		{
+			name: "Valid configuration",
+			setupModule: func() *DaggerAutofix {
+				module := New()
+				module.GitHubToken = createTestSecret("github-token", "test-token")
+				module.LLMAPIKey = createTestSecret("llm-key", "test-key")
+				module.RepoOwner = "owner"
+				module.RepoName = "repo"
+				return module
+			},
+			expectedError: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			module := tt.setupModule()
+			err := module.validateConfiguration()
+
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestEnsureInitialized tests the ensureInitialized method
+func TestEnsureInitialized(t *testing.T) {
+	module := New()
+	
+	// Should return error when not initialized
+	err := module.ensureInitialized()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "module not initialized")
+	
+	// Set up valid configuration for initialization test
+	module.GitHubToken = createTestSecret("github-token", "test-token")
+	module.LLMAPIKey = createTestSecret("llm-key", "test-key")
+	module.RepoOwner = "owner"
+	module.RepoName = "repo"
+	
+	// Note: We can't fully test initialization without Dagger context
+	// But we can test the validation part
+}
+
+// TestShouldProcessRun tests the shouldProcessRun method
+func TestShouldProcessRun(t *testing.T) {
+	module := New()
+	
+	// Test with non-nil run (current implementation returns true)
+	run := &WorkflowRun{
+		ID:         123,
+		Status:     "completed",
+		Conclusion: "failure",
+	}
+	result := module.shouldProcessRun(run)
+	assert.True(t, result) // Current implementation is simplified and returns true
+	
+	// Test with any run (current implementation returns true)
+	run = &WorkflowRun{
+		ID:         124,
+		Status:     "completed", 
+		Conclusion: "success",
+	}
+	result = module.shouldProcessRun(run)
+	assert.True(t, result) // Current implementation is simplified
+}
+
+// TestSelectBestFix tests the selectBestFix method
+func TestSelectBestFix(t *testing.T) {
+	module := New()
+	
+	// Test with empty validations
+	result := module.selectBestFix([]*FixValidationResult{})
+	assert.Nil(t, result)
+	
+	// Test with single validation
+	validation1 := &FixValidationResult{
+		Fix: &ProposedFix{
+			ID:         "fix-1",
+			Confidence: 0.8,
+			Type:       CodeFix,
+		},
+		Valid:     true,
+		Timestamp: time.Now(),
+	}
+	result = module.selectBestFix([]*FixValidationResult{validation1})
+	assert.Equal(t, validation1, result)
+	
+	// Test with multiple validations - should select highest confidence
+	validation2 := &FixValidationResult{
+		Fix: &ProposedFix{
+			ID:         "fix-2",
+			Confidence: 0.9,
+			Type:       DependencyFix,
+		},
+		Valid:     true,
+		Timestamp: time.Now(),
+	}
+	validation3 := &FixValidationResult{
+		Fix: &ProposedFix{
+			ID:         "fix-3",
+			Confidence: 0.7,
+			Type:       ConfigurationFix,
+		},
+		Valid:     true,
+		Timestamp: time.Now(),
+	}
+	
+	validations := []*FixValidationResult{validation1, validation2, validation3}
+	result = module.selectBestFix(validations)
+	assert.Equal(t, validation2, result) // Should select validation2 with highest confidence (0.9)
+}
+
+
+
 // TestFailureClassification tests failure type classification
 func TestFailureClassification(t *testing.T) {
 	testCases := []struct {
