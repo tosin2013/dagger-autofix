@@ -86,18 +86,24 @@ func TestErrorScenarios(t *testing.T) {
 		// Test behavior with network failures
 		module := setupTestModule(t)
 
-		// Simulate timeout context
+		// Simulate timeout context with a more deterministic approach
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel()
 
-		// Allow the context to expire
-		time.Sleep(5 * time.Millisecond)
+		// Allow the context to expire with sufficient time
+		time.Sleep(10 * time.Millisecond)
 
-		// This should handle timeout gracefully
+		// Explicitly check context is cancelled before proceeding
+		if ctx.Err() == nil {
+			t.Fatal("Context should be cancelled but isn't")
+		}
+
+		// This should handle timeout gracefully and return context error
 		_, err := module.GetMetrics(ctx)
-		assert.Error(t, err)
+		assert.Error(t, err, "Expected context timeout error but got nil")
 		if err != nil {
-			assert.Contains(t, strings.ToLower(err.Error()), "context")
+			assert.Contains(t, strings.ToLower(err.Error()), "context", 
+				"Expected context-related error but got: %v", err)
 		}
 	})
 
