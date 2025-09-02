@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
-	"fmt"
-	"strings"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestEnhancedIntegration provides comprehensive integration testing
@@ -21,11 +21,11 @@ func TestEnhancedIntegration(t *testing.T) {
 	t.Run("FullWorkflowIntegration", func(t *testing.T) {
 		// Test complete workflow with mock data
 		module := setupTestModule(t)
-		
+
 		// Mock workflow context
 		_ = context.Background()
 		mockFailureContext := createMockFailureContext()
-		
+
 		// Test failure analysis
 		analysis, err := simulateFailureAnalysis(module, mockFailureContext)
 		assert.NoError(t, err)
@@ -37,10 +37,10 @@ func TestEnhancedIntegration(t *testing.T) {
 	t.Run("ConcurrentOperations", func(t *testing.T) {
 		_ = setupTestModule(t)
 		const numConcurrent = 10
-		
+
 		var wg sync.WaitGroup
 		results := make([]error, numConcurrent)
-		
+
 		for i := 0; i < numConcurrent; i++ {
 			wg.Add(1)
 			go func(index int) {
@@ -50,13 +50,13 @@ func TestEnhancedIntegration(t *testing.T) {
 					WithGitHubToken(createTestSecret("test-token", fmt.Sprintf("token-%d", index))).
 					WithLLMProvider("openai", createTestSecret("test-key", fmt.Sprintf("key-%d", index))).
 					WithRepository("test-owner", "test-repo")
-				
+
 				results[index] = testModule.validateConfiguration()
 			}(i)
 		}
-		
+
 		wg.Wait()
-		
+
 		// All operations should succeed
 		for i, err := range results {
 			assert.NoError(t, err, "Concurrent operation %d failed", i)
@@ -66,7 +66,7 @@ func TestEnhancedIntegration(t *testing.T) {
 	t.Run("LLMProviderFailover", func(t *testing.T) {
 		// Test failover between LLM providers
 		providers := []LLMProvider{OpenAI, Anthropic, Gemini, DeepSeek, LiteLLM}
-		
+
 		for _, provider := range providers {
 			t.Run(string(provider), func(t *testing.T) {
 				config := getDefaultConfig(provider)
@@ -85,33 +85,36 @@ func TestErrorScenarios(t *testing.T) {
 	t.Run("NetworkFailures", func(t *testing.T) {
 		// Test behavior with network failures
 		module := setupTestModule(t)
-		
+
 		// Simulate timeout context
-		_, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 		defer cancel()
-		
+
+		// Allow the context to expire
+		time.Sleep(5 * time.Millisecond)
+
 		// This should handle timeout gracefully
-		_, err := module.GetMetrics(context.Background())
+		_, err := module.GetMetrics(ctx)
 		assert.Error(t, err)
 		if err != nil {
-			assert.Contains(t, err.Error(), "context")
+			assert.Contains(t, strings.ToLower(err.Error()), "context")
 		}
 	})
 
 	t.Run("InvalidInputs", func(t *testing.T) {
 		module := setupTestModule(t)
 		ctx := context.Background()
-		
+
 		// Test invalid run IDs
 		invalidRunIDs := []int64{-1, 0, -999999}
-		
+
 		for _, runID := range invalidRunIDs {
 			t.Run(fmt.Sprintf("RunID_%d", runID), func(t *testing.T) {
 				// Should validate input and return proper error
 				// Note: Current implementation doesn't validate, this test documents needed improvement
 				result, err := module.AnalyzeFailure(ctx, runID)
 				if runID <= 0 {
-					// This assertion will fail with current implementation, 
+					// This assertion will fail with current implementation,
 					// documenting the need for input validation
 					_ = result
 					_ = err
@@ -125,10 +128,10 @@ func TestErrorScenarios(t *testing.T) {
 	t.Run("LargeLogHandling", func(t *testing.T) {
 		// Test handling of very large log files
 		engine := NewFailureAnalysisEngine(nil, logrus.New())
-		
+
 		// Create large log content
 		largeLog := strings.Repeat("ERROR: Something went wrong\n", 10000) // ~250KB
-		
+
 		failureContext := FailureContext{
 			WorkflowRun: &WorkflowRun{ID: 123, Name: "test"},
 			Logs: &WorkflowLogs{
@@ -137,7 +140,7 @@ func TestErrorScenarios(t *testing.T) {
 			},
 			Repository: RepositoryContext{Owner: "test", Name: "repo"},
 		}
-		
+
 		// This should not consume excessive memory
 		classification := engine.preClassifyFailure(failureContext)
 		assert.NotNil(t, classification)
@@ -146,9 +149,9 @@ func TestErrorScenarios(t *testing.T) {
 
 	t.Run("ConfigurationErrors", func(t *testing.T) {
 		testCases := []struct {
-			name        string
-			setupFunc   func() *DaggerAutofix
-			expectError bool
+			name          string
+			setupFunc     func() *DaggerAutofix
+			expectError   bool
 			errorContains string
 		}{
 			{
@@ -158,17 +161,17 @@ func TestErrorScenarios(t *testing.T) {
 						WithRepository("owner", "repo").
 						WithLLMProvider("openai", createTestSecret("key", "test"))
 				},
-				expectError: true,
+				expectError:   true,
 				errorContains: "GitHub token",
 			},
 			{
-				name: "MissingLLMKey", 
+				name: "MissingLLMKey",
 				setupFunc: func() *DaggerAutofix {
 					return New().
 						WithGitHubToken(createTestSecret("token", "test")).
 						WithRepository("owner", "repo")
 				},
-				expectError: true,
+				expectError:   true,
 				errorContains: "LLM API key",
 			},
 			{
@@ -178,16 +181,16 @@ func TestErrorScenarios(t *testing.T) {
 						WithGitHubToken(createTestSecret("token", "test")).
 						WithLLMProvider("openai", createTestSecret("key", "test"))
 				},
-				expectError: true,
+				expectError:   true,
 				errorContains: "repository",
 			},
 		}
-		
+
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				module := tc.setupFunc()
 				err := module.validateConfiguration()
-				
+
 				if tc.expectError {
 					assert.Error(t, err)
 					if tc.errorContains != "" {
@@ -205,17 +208,17 @@ func TestErrorScenarios(t *testing.T) {
 		// Create many large objects to simulate memory pressure
 		var modules []*DaggerAutofix
 		const numModules = 100
-		
+
 		for i := 0; i < numModules; i++ {
 			module := New().
 				WithGitHubToken(createTestSecret("token", fmt.Sprintf("token-%d", i))).
 				WithRepository("owner", "repo")
 			modules = append(modules, module)
 		}
-		
+
 		// All modules should be created successfully
 		assert.Len(t, modules, numModules)
-		
+
 		// Cleanup
 	})
 }
@@ -225,23 +228,23 @@ func TestPerformanceBenchmarks(t *testing.T) {
 	t.Run("ModuleCreationSpeed", func(t *testing.T) {
 		const iterations = 1000
 		start := time.Now()
-		
+
 		for i := 0; i < iterations; i++ {
 			_ = New()
 		}
-		
+
 		duration := time.Since(start)
 		avgDuration := duration / iterations
-		
+
 		// Should create modules quickly (< 1ms average)
-		assert.Less(t, avgDuration, time.Millisecond, 
+		assert.Less(t, avgDuration, time.Millisecond,
 			"Module creation too slow: %v per module", avgDuration)
 	})
 
 	t.Run("ConfigurationChaining", func(t *testing.T) {
 		const iterations = 1000
 		start := time.Now()
-		
+
 		for i := 0; i < iterations; i++ {
 			_ = New().
 				WithGitHubToken(createTestSecret("token", fmt.Sprintf("token-%d", i))).
@@ -249,10 +252,10 @@ func TestPerformanceBenchmarks(t *testing.T) {
 				WithRepository("owner", "repo").
 				WithMinCoverage(85)
 		}
-		
+
 		duration := time.Since(start)
 		avgDuration := duration / iterations
-		
+
 		// Configuration chaining should be fast (< 100μs average)
 		assert.Less(t, avgDuration, 100*time.Microsecond,
 			"Configuration chaining too slow: %v per chain", avgDuration)
@@ -260,35 +263,35 @@ func TestPerformanceBenchmarks(t *testing.T) {
 
 	t.Run("PatternMatchingPerformance", func(t *testing.T) {
 		engine := NewFailureAnalysisEngine(nil, logrus.New())
-		
+
 		// Create various failure contexts to test pattern matching speed
 		contexts := []FailureContext{
 			createMockFailureContext(),
 			{
 				Logs: &WorkflowLogs{
 					ErrorLines: []string{"go build failed"},
-					RawLogs: "go build failed with multiple errors",
+					RawLogs:    "go build failed with multiple errors",
 				},
 			},
 			{
 				Logs: &WorkflowLogs{
 					ErrorLines: []string{"npm install failed"},
-					RawLogs: "npm install failed: permission denied",
+					RawLogs:    "npm install failed: permission denied",
 				},
 			},
 		}
-		
+
 		const iterations = 1000
 		start := time.Now()
-		
+
 		for i := 0; i < iterations; i++ {
 			context := contexts[i%len(contexts)]
 			_ = engine.preClassifyFailure(context)
 		}
-		
+
 		duration := time.Since(start)
 		avgDuration := duration / iterations
-		
+
 		// Pattern matching should be fast (< 1ms average)
 		assert.Less(t, avgDuration, time.Millisecond,
 			"Pattern matching too slow: %v per match", avgDuration)
@@ -299,7 +302,7 @@ func TestPerformanceBenchmarks(t *testing.T) {
 func TestSecurityScenarios(t *testing.T) {
 	t.Run("TokenMasking", func(t *testing.T) {
 		cli := NewCLI()
-		
+
 		testCases := []struct {
 			input    string
 			expected string
@@ -309,7 +312,7 @@ func TestSecurityScenarios(t *testing.T) {
 			{"ghp_1234567890abcdef", "ghp_***cdef"},
 			{"sk-proj-very-long-token-here", "sk-***here"},
 		}
-		
+
 		for _, tc := range testCases {
 			masked := cli.maskToken(tc.input)
 			assert.Equal(t, tc.expected, masked)
@@ -324,19 +327,19 @@ func TestSecurityScenarios(t *testing.T) {
 		// Test for potential injection attacks in log messages
 		maliciousInputs := []string{
 			"normal input",
-			"input\nwith\nnewlines", 
+			"input\nwith\nnewlines",
 			"input\rwith\rcarriage\rreturns",
 			"input\x00with\x00nulls",
 			"input\"with'quotes",
 		}
-		
+
 		for _, input := range maliciousInputs {
 			t.Run(fmt.Sprintf("Input_%d", len(input)), func(t *testing.T) {
 				// Test that malicious input doesn't break logging
 				logger := logrus.New()
 				// This should not panic or cause log injection
 				logger.WithField("test_input", input).Info("Testing input")
-				
+
 				// For now, just ensure it doesn't panic
 				// In a real implementation, we'd check for proper sanitization
 				assert.NotEmpty(t, input)
@@ -347,16 +350,19 @@ func TestSecurityScenarios(t *testing.T) {
 	t.Run("ResourceLimits", func(t *testing.T) {
 		// Test that operations respect resource limits
 		// Create a context with short timeout
-		_, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		
+
 		module := setupTestModule(t)
-		
+
+		// Let the context expire
+		time.Sleep(150 * time.Millisecond)
+
 		// Operations should respect context cancellation
-		_, err := module.GetMetrics(context.Background())
+		_, err := module.GetMetrics(ctx)
 		if err != nil {
 			// Should be context cancellation, not other errors
-			assert.Contains(t, err.Error(), "context")
+			assert.Contains(t, strings.ToLower(err.Error()), "context")
 		}
 	})
 }
@@ -364,11 +370,11 @@ func TestSecurityScenarios(t *testing.T) {
 // TestFrameworkCompatibility tests different project types
 func TestFrameworkCompatibility(t *testing.T) {
 	engine := NewTestEngine(85, logrus.New())
-	
+
 	testCases := []struct {
-		fileName     string
+		fileName          string
 		expectedFramework string
-		description  string
+		description       string
 	}{
 		{"package.json", "nodejs", "Node.js project"},
 		{"go.mod", "golang", "Go project"},
@@ -379,13 +385,13 @@ func TestFrameworkCompatibility(t *testing.T) {
 		{"Makefile", "generic", "Generic project"},
 		{"unknown.file", "generic", "Unknown project type"},
 	}
-	
+
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			framework := engine.getFrameworkByFile(tc.fileName)
 			if framework != nil {
 				assert.Equal(t, tc.expectedFramework, framework.Name)
-				
+
 				// Verify framework has required fields
 				assert.NotEmpty(t, framework.Language)
 				assert.NotEmpty(t, framework.TestCommand)
@@ -493,10 +499,10 @@ func TestComplexScenarios(t *testing.T) {
 	t.Run("MonorepoSupport", func(t *testing.T) {
 		// Test support for monorepo structures
 		engine := NewTestEngine(85, logrus.New())
-		
+
 		// Simulate a monorepo with multiple frameworks
 		frameworks := []string{"nodejs", "golang", "python"}
-		
+
 		for _, framework := range frameworks {
 			testFramework := engine.testFrameworks[framework]
 			assert.NotNil(t, testFramework)
@@ -507,7 +513,7 @@ func TestComplexScenarios(t *testing.T) {
 	t.Run("DeepCallStack", func(t *testing.T) {
 		// Test handling of deep call stacks without stack overflow
 		const maxDepth = 100
-		
+
 		var recursiveTest func(int) error
 		recursiveTest = func(depth int) error {
 			if depth >= maxDepth {
@@ -516,7 +522,7 @@ func TestComplexScenarios(t *testing.T) {
 			// Simulate recursive operation
 			return recursiveTest(depth + 1)
 		}
-		
+
 		err := recursiveTest(0)
 		assert.NoError(t, err)
 	})
@@ -524,17 +530,17 @@ func TestComplexScenarios(t *testing.T) {
 	t.Run("UnicodeHandling", func(t *testing.T) {
 		// Test handling of unicode characters in logs and messages
 		unicodeLog := "Error: 测试失败 🚨 Тест провален ñäñ"
-		
+
 		context := FailureContext{
 			Logs: &WorkflowLogs{
 				RawLogs:    unicodeLog,
 				ErrorLines: []string{unicodeLog},
 			},
 		}
-		
+
 		engine := NewFailureAnalysisEngine(nil, logrus.New())
 		classification := engine.preClassifyFailure(context)
-		
+
 		assert.NotNil(t, classification)
 		// Should handle unicode without crashing
 	})

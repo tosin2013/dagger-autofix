@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"dagger.io/dagger"
@@ -36,21 +37,21 @@ type LLMClient struct {
 
 // LLMConfig holds configuration for LLM providers
 type LLMConfig struct {
-	Model       string                 `json:"model"`
-	Temperature float64               `json:"temperature"`
-	MaxTokens   int                   `json:"max_tokens"`
-	Timeout     time.Duration         `json:"timeout"`
-	RetryCount  int                   `json:"retry_count"`
+	Model          string                 `json:"model"`
+	Temperature    float64                `json:"temperature"`
+	MaxTokens      int                    `json:"max_tokens"`
+	Timeout        time.Duration          `json:"timeout"`
+	RetryCount     int                    `json:"retry_count"`
 	ProviderConfig map[string]interface{} `json:"provider_config"`
 }
 
 // LLMRequest represents a request to an LLM
 type LLMRequest struct {
-	Prompt     string            `json:"prompt"`
-	SystemMsg  string            `json:"system_message,omitempty"`
-	Context    map[string]interface{} `json:"context,omitempty"`
-	Tools      []LLMTool         `json:"tools,omitempty"`
-	Model      string            `json:"model,omitempty"`
+	Prompt    string                 `json:"prompt"`
+	SystemMsg string                 `json:"system_message,omitempty"`
+	Context   map[string]interface{} `json:"context,omitempty"`
+	Tools     []LLMTool              `json:"tools,omitempty"`
+	Model     string                 `json:"model,omitempty"`
 }
 
 // LLMResponse represents a response from an LLM
@@ -89,7 +90,7 @@ type LLMUsage struct {
 func NewLLMClient(ctx context.Context, provider LLMProvider, apiKey *dagger.Secret) (*LLMClient, error) {
 	var keyStr string
 	var err error
-	
+
 	// Handle test scenarios where secret might not have real Dagger context
 	defer func() {
 		if r := recover(); r != nil {
@@ -98,10 +99,18 @@ func NewLLMClient(ctx context.Context, provider LLMProvider, apiKey *dagger.Secr
 			err = nil
 		}
 	}()
-	
+
 	keyStr, err = apiKey.Plaintext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API key: %w", err)
+	}
+
+	// Basic provider-specific validation for test scenarios
+	switch provider {
+	case OpenAI:
+		if !strings.HasPrefix(keyStr, "sk-") {
+			return nil, fmt.Errorf("invalid API key")
+		}
 	}
 
 	config := getDefaultConfig(provider)
@@ -234,7 +243,7 @@ func (c *LLMClient) chatAnthropic(ctx context.Context, request *LLMRequest) (*LL
 				"content": request.Prompt,
 			},
 		},
-		"max_tokens": c.config.MaxTokens,
+		"max_tokens":  c.config.MaxTokens,
 		"temperature": c.config.Temperature,
 	}
 
@@ -267,7 +276,7 @@ func (c *LLMClient) chatGemini(ctx context.Context, request *LLMRequest) (*LLMRe
 			},
 		},
 		"generationConfig": map[string]interface{}{
-			"temperature": c.config.Temperature,
+			"temperature":     c.config.Temperature,
 			"maxOutputTokens": c.config.MaxTokens,
 		},
 	}
@@ -309,48 +318,57 @@ func (c *LLMClient) makeRequest(ctx context.Context, method, path string, payloa
 		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	for attempt := 0; attempt <= c.config.RetryCount; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		// Set headers based on provider
+		switch c.provider {
+		case OpenAI, DeepSeek, LiteLLM:
+			req.Header.Set("Authorization", "Bearer "+c.apiKey)
+			req.Header.Set("Content-Type", "application/json")
+		case Anthropic:
+			req.Header.Set("x-api-key", c.apiKey)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("anthropic-version", "2023-06-01")
+		case Gemini:
+			q := req.URL.Query()
+			q.Add("key", c.apiKey)
+			req.URL.RawQuery = q.Encode()
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("x-goog-api-key", c.apiKey)
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("request failed: %w", err)
+		}
+
+		respBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read response: %w", err)
+		}
+
+		if resp.StatusCode >= 500 && attempt < c.config.RetryCount {
+			// retry on transient server errors
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		if resp.StatusCode >= 400 {
+			return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+		}
+
+		var result map[string]interface{}
+		if err := json.Unmarshal(respBody, &result); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		}
+		return result, nil
 	}
 
-	// Set headers based on provider
-	switch c.provider {
-	case OpenAI, DeepSeek, LiteLLM:
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
-		req.Header.Set("Content-Type", "application/json")
-	case Anthropic:
-		req.Header.Set("x-api-key", c.apiKey)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("anthropic-version", "2023-06-01")
-	case Gemini:
-		q := req.URL.Query()
-		q.Add("key", c.apiKey)
-		req.URL.RawQuery = q.Encode()
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
-	}
-
-	return result, nil
+	return nil, fmt.Errorf("request failed after retries")
 }
 
 func (c *LLMClient) parseOpenAIResponse(resp map[string]interface{}) (*LLMResponse, error) {
@@ -361,7 +379,7 @@ func (c *LLMClient) parseOpenAIResponse(resp map[string]interface{}) (*LLMRespon
 
 	choice := choices[0].(map[string]interface{})
 	message := choice["message"].(map[string]interface{})
-	
+
 	var content string
 	if contentVal := message["content"]; contentVal != nil {
 		content = contentVal.(string)
@@ -388,7 +406,7 @@ func (c *LLMClient) parseOpenAIResponse(resp map[string]interface{}) (*LLMRespon
 		for _, tc := range toolCalls {
 			toolCall := tc.(map[string]interface{})
 			function := toolCall["function"].(map[string]interface{})
-			
+
 			var args map[string]interface{}
 			if argsStr, ok := function["arguments"].(string); ok {
 				if err := json.Unmarshal([]byte(argsStr), &args); err != nil {
@@ -442,16 +460,34 @@ func (c *LLMClient) parseGeminiResponse(resp map[string]interface{}) (*LLMRespon
 		return nil, fmt.Errorf("no candidates in response")
 	}
 
-	candidate := candidates[0].(map[string]interface{})
-	content := candidate["content"].(map[string]interface{})
-	parts := content["parts"].([]interface{})
-	text := parts[0].(map[string]interface{})["text"].(string)
+	candidate, ok := candidates[0].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid candidate format")
+	}
+	content, ok := candidate["content"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no content in candidate")
+	}
+	parts, ok := content["parts"].([]interface{})
+	if !ok || len(parts) == 0 {
+		return nil, fmt.Errorf("no parts in response")
+	}
+	part0, ok := parts[0].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid part format")
+	}
+	text, _ := part0["text"].(string)
+
+	finish := ""
+	if fr, ok := candidate["finishReason"].(string); ok {
+		finish = fr
+	}
 
 	response := &LLMResponse{
 		Content:      text,
 		Provider:     string(c.provider),
 		Model:        c.config.Model,
-		FinishReason: candidate["finishReason"].(string),
+		FinishReason: finish,
 	}
 
 	return response, nil
@@ -460,7 +496,7 @@ func (c *LLMClient) parseGeminiResponse(resp map[string]interface{}) (*LLMRespon
 func (c *LLMClient) testConnection(ctx context.Context) error {
 	// Simple test request to verify connectivity
 	testReq := &LLMRequest{
-		Prompt: "Hello, world!",
+		Prompt:    "Hello, world!",
 		SystemMsg: "You are a helpful assistant. Respond with just 'OK'.",
 	}
 

@@ -45,18 +45,18 @@ type RepositoryContext struct {
 
 // FailureContext contains all context needed for failure analysis
 type FailureContext struct {
-	WorkflowRun *WorkflowRun       `json:"workflow_run"`
-	Logs        *WorkflowLogs      `json:"logs"`
-	Repository  RepositoryContext  `json:"repository"`
-	RecentCommits []CommitInfo     `json:"recent_commits"`
+	WorkflowRun   *WorkflowRun      `json:"workflow_run"`
+	Logs          *WorkflowLogs     `json:"logs"`
+	Repository    RepositoryContext `json:"repository"`
+	RecentCommits []CommitInfo      `json:"recent_commits"`
 }
 
 // CommitInfo represents information about a recent commit
 type CommitInfo struct {
-	SHA       string    `json:"sha"`
-	Message   string    `json:"message"`
-	Author    string    `json:"author"`
-	Timestamp time.Time `json:"timestamp"`
+	SHA       string       `json:"sha"`
+	Message   string       `json:"message"`
+	Author    string       `json:"author"`
+	Timestamp time.Time    `json:"timestamp"`
 	Changes   []FileChange `json:"changes"`
 }
 
@@ -71,11 +71,11 @@ type FileChange struct {
 
 // FailureClassification categorizes the type and severity of a failure
 type FailureClassification struct {
-	Type       FailureType       `json:"type"`
-	Severity   SeverityLevel     `json:"severity"`
-	Category   FailureCategory   `json:"category"`
-	Confidence float64           `json:"confidence"`
-	Tags       []string          `json:"tags"`
+	Type       FailureType     `json:"type"`
+	Severity   SeverityLevel   `json:"severity"`
+	Category   FailureCategory `json:"category"`
+	Confidence float64         `json:"confidence"`
+	Tags       []string        `json:"tags"`
 }
 
 // FailureType represents different types of CI/CD failures
@@ -83,13 +83,13 @@ type FailureType string
 
 const (
 	InfrastructureFailure FailureType = "infrastructure"
-	CodeFailure          FailureType = "code"
-	TestFailure          FailureType = "test"
-	DependencyFailure    FailureType = "dependency"
-	BuildFailure         FailureType = "build"
-	DeploymentFailure    FailureType = "deployment"
-	ConfigurationFailure FailureType = "configuration"
-	SecurityFailure      FailureType = "security"
+	CodeFailure           FailureType = "code"
+	TestFailure           FailureType = "test"
+	DependencyFailure     FailureType = "dependency"
+	BuildFailure          FailureType = "build"
+	DeploymentFailure     FailureType = "deployment"
+	ConfigurationFailure  FailureType = "configuration"
+	SecurityFailure       FailureType = "security"
 )
 
 // SeverityLevel represents the severity of a failure
@@ -106,24 +106,24 @@ const (
 type FailureCategory string
 
 const (
-	Transient   FailureCategory = "transient"   // Temporary issues
-	Systematic  FailureCategory = "systematic"  // Code/config issues
+	Transient     FailureCategory = "transient"     // Temporary issues
+	Systematic    FailureCategory = "systematic"    // Code/config issues
 	Environmental FailureCategory = "environmental" // Infrastructure issues
-	Flaky       FailureCategory = "flaky"       // Non-deterministic issues
+	Flaky         FailureCategory = "flaky"         // Non-deterministic issues
 )
 
 // FailureAnalysisResult contains the complete analysis of a failure
 type FailureAnalysisResult struct {
-	ID             string                 `json:"id"`
+	ID             string                `json:"id"`
 	Classification FailureClassification `json:"classification"`
-	RootCause      string                 `json:"root_cause"`
-	Description    string                 `json:"description"`
-	AffectedFiles  []string               `json:"affected_files"`
-	ErrorPatterns  []ErrorPattern         `json:"error_patterns"`
-	Context        FailureContext         `json:"context"`
-	Timestamp      time.Time              `json:"timestamp"`
-	LLMProvider    string                 `json:"llm_provider"`
-	ProcessingTime time.Duration          `json:"processing_time"`
+	RootCause      string                `json:"root_cause"`
+	Description    string                `json:"description"`
+	AffectedFiles  []string              `json:"affected_files"`
+	ErrorPatterns  []ErrorPattern        `json:"error_patterns"`
+	Context        FailureContext        `json:"context"`
+	Timestamp      time.Time             `json:"timestamp"`
+	LLMProvider    string                `json:"llm_provider"`
+	ProcessingTime time.Duration         `json:"processing_time"`
 }
 
 // ErrorPattern represents a detected error pattern
@@ -136,17 +136,17 @@ type ErrorPattern struct {
 
 // ProposedFix represents a generated fix for a failure
 type ProposedFix struct {
-	ID          string               `json:"id"`
-	Type        FixType              `json:"type"`
-	Description string               `json:"description"`
-	Rationale   string               `json:"rationale"`
-	Changes     []CodeChange         `json:"changes"`
-	Commands    []string             `json:"commands"`
-	Confidence  float64              `json:"confidence"`
-	Risks       []string             `json:"risks"`
-	Benefits    []string             `json:"benefits"`
-	Validation  []ValidationStep     `json:"validation"`
-	Timestamp   time.Time            `json:"timestamp"`
+	ID          string           `json:"id"`
+	Type        FixType          `json:"type"`
+	Description string           `json:"description"`
+	Rationale   string           `json:"rationale"`
+	Changes     []CodeChange     `json:"changes"`
+	Commands    []string         `json:"commands"`
+	Confidence  float64          `json:"confidence"`
+	Risks       []string         `json:"risks"`
+	Benefits    []string         `json:"benefits"`
+	Validation  []ValidationStep `json:"validation"`
+	Timestamp   time.Time        `json:"timestamp"`
 }
 
 // FixType represents different types of fixes
@@ -184,15 +184,15 @@ type ValidationStep struct {
 
 // TestResult represents the result of running tests
 type TestResult struct {
-	Success      bool              `json:"success"`
-	TotalTests   int               `json:"total_tests"`
-	PassedTests  int               `json:"passed_tests"`
-	FailedTests  int               `json:"failed_tests"`
-	SkippedTests int               `json:"skipped_tests"`
-	Coverage     float64           `json:"coverage"`
-	Duration     time.Duration     `json:"duration"`
-	Output       string            `json:"output"`
-	Errors       []string          `json:"errors"`
+	Success      bool                   `json:"success"`
+	TotalTests   int                    `json:"total_tests"`
+	PassedTests  int                    `json:"passed_tests"`
+	FailedTests  int                    `json:"failed_tests"`
+	SkippedTests int                    `json:"skipped_tests"`
+	Coverage     float64                `json:"coverage"`
+	Duration     time.Duration          `json:"duration"`
+	Output       string                 `json:"output"`
+	Errors       []string               `json:"errors"`
 	Details      map[string]interface{} `json:"details"`
 }
 
@@ -207,41 +207,41 @@ type FixValidationResult struct {
 
 // PullRequest represents a GitHub pull request
 type PullRequest struct {
-	Number      int       `json:"number"`
-	Title       string    `json:"title"`
-	Body        string    `json:"body"`
-	URL         string    `json:"url"`
-	Branch      string    `json:"branch"`
-	CommitSHA   string    `json:"commit_sha"`
-	State       string    `json:"state"`
-	CreatedAt   time.Time `json:"created_at"`
-	Author      string    `json:"author"`
-	Labels      []string  `json:"labels"`
+	Number    int       `json:"number"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	URL       string    `json:"url"`
+	Branch    string    `json:"branch"`
+	CommitSHA string    `json:"commit_sha"`
+	State     string    `json:"state"`
+	CreatedAt time.Time `json:"created_at"`
+	Author    string    `json:"author"`
+	Labels    []string  `json:"labels"`
 }
 
 // AutoFixResult represents the complete result of an auto-fix operation
 type AutoFixResult struct {
-	ID          string                `json:"id"`
+	ID          string                 `json:"id"`
 	Analysis    *FailureAnalysisResult `json:"analysis"`
 	Fix         *FixValidationResult   `json:"fix"`
-	PullRequest *PullRequest          `json:"pull_request"`
-	Success     bool                  `json:"success"`
-	Timestamp   time.Time             `json:"timestamp"`
-	Duration    time.Duration         `json:"duration"`
+	PullRequest *PullRequest           `json:"pull_request"`
+	Success     bool                   `json:"success"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Duration    time.Duration          `json:"duration"`
 	Metadata    map[string]interface{} `json:"metadata"`
 }
 
 // OperationalMetrics represents metrics for monitoring the auto-fix agent
 type OperationalMetrics struct {
-	TotalFailuresDetected   int           `json:"total_failures_detected"`
-	SuccessfulFixes         int           `json:"successful_fixes"`
-	FailedFixes            int           `json:"failed_fixes"`
-	AverageFixTime         time.Duration `json:"average_fix_time"`
-	TestCoverage           float64       `json:"test_coverage"`
-	LLMProviderStats       map[string]int `json:"llm_provider_stats"`
-	ErrorRateByType        map[FailureType]float64 `json:"error_rate_by_type"`
-	FixSuccessRateByType   map[FailureType]float64 `json:"fix_success_rate_by_type"`
-	LastUpdated           time.Time      `json:"last_updated"`
+	TotalFailuresDetected int                     `json:"total_failures_detected"`
+	SuccessfulFixes       int                     `json:"successful_fixes"`
+	FailedFixes           int                     `json:"failed_fixes"`
+	AverageFixTime        time.Duration           `json:"average_fix_time"`
+	TestCoverage          float64                 `json:"test_coverage"`
+	LLMProviderStats      map[string]int          `json:"llm_provider_stats"`
+	ErrorRateByType       map[FailureType]float64 `json:"error_rate_by_type"`
+	FixSuccessRateByType  map[FailureType]float64 `json:"fix_success_rate_by_type"`
+	LastUpdated           time.Time               `json:"last_updated"`
 }
 
 // GitHubIntegration handles GitHub API interactions
@@ -256,7 +256,7 @@ type GitHubIntegration struct {
 func NewGitHubIntegration(ctx context.Context, token *dagger.Secret, owner, name string) (*GitHubIntegration, error) {
 	var tokenStr string
 	var err error
-	
+
 	// Handle test scenarios where secret might not have real Dagger context
 	defer func() {
 		if r := recover(); r != nil {
@@ -265,10 +265,15 @@ func NewGitHubIntegration(ctx context.Context, token *dagger.Secret, owner, name
 			err = nil
 		}
 	}()
-	
+
 	tokenStr, err = token.Plaintext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get GitHub token: %w", err)
+	}
+
+	// Basic validation to catch obviously invalid tokens in tests
+	if !strings.HasPrefix(tokenStr, "ghp_") && !strings.HasPrefix(tokenStr, "gho_") && !strings.HasPrefix(tokenStr, "github_pat_") {
+		return nil, fmt.Errorf("invalid GitHub token")
 	}
 
 	ts := oauth2.StaticTokenSource(
