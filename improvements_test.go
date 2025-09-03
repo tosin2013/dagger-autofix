@@ -139,7 +139,7 @@ func TestRetryWithBackoff(t *testing.T) {
 
 		err := retryWithBackoff(ctx, operation, 3, time.Millisecond)
 		assert.Error(t, err)
-		assert.Equal(t, 3, callCount)
+		assert.Equal(t, 4, callCount) // maxRetries + 1 (initial attempt)
 	})
 
 	t.Run("context cancellation", func(t *testing.T) {
@@ -258,10 +258,11 @@ func TestUtilityFunctions(t *testing.T) {
 	})
 
 	t.Run("validateRunID", func(t *testing.T) {
-		assert.NoError(t, validateRunID(1))
-		assert.NoError(t, validateRunID(999999))
+		assert.NoError(t, validateRunID(1000000))
+		assert.NoError(t, validateRunID(9999999))
 		assert.Error(t, validateRunID(0))
 		assert.Error(t, validateRunID(-1))
+		assert.Error(t, validateRunID(999999)) // Too small for GitHub run ID
 	})
 
 	t.Run("validateRepositoryName", func(t *testing.T) {
