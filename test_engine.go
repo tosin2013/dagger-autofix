@@ -7,16 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"dagger.io/dagger"
 	"github.com/sirupsen/logrus"
 )
 
 // TestEngine handles automated testing and validation of fixes
 type TestEngine struct {
-	minCoverage    int
-	logger         *logrus.Logger
-	testFrameworks map[string]*TestFramework
-	coverageTools  map[string]*CoverageTool
+	minCoverage       int
+	logger            *logrus.Logger
+	testFrameworks    map[string]*TestFramework
+	coverageTools     map[string]*CoverageTool
+	containerProvider ContainerProvider // Add this field
 }
 
 // TestFramework defines testing capabilities for a specific language/framework
@@ -52,11 +52,17 @@ type CoverageThresholds struct {
 // NewTestEngine creates a new test engine with specified minimum coverage
 func NewTestEngine(minCoverage int, logger *logrus.Logger) *TestEngine {
 	return &TestEngine{
-		minCoverage:    minCoverage,
-		logger:         logger,
-		testFrameworks: loadTestFrameworks(),
-		coverageTools:  loadCoverageTools(),
+		minCoverage:       minCoverage,
+		logger:            logger,
+		testFrameworks:    loadTestFrameworks(),
+		coverageTools:     loadCoverageTools(),
+		containerProvider: &RealContainerProvider{}, // Default to real implementation
 	}
+}
+
+// SetContainerProvider allows injecting mock provider for testing
+func (e *TestEngine) SetContainerProvider(provider ContainerProvider) {
+	e.containerProvider = provider
 }
 
 // RunTests executes the test suite for a given repository and branch
@@ -207,11 +213,11 @@ func (e *TestEngine) GenerateTestsForFix(ctx context.Context, fix *ProposedFix, 
 
 // Private helper methods
 
-func (e *TestEngine) createTestContainer(ctx context.Context, owner, repo, branch string) (*dagger.Container, error) {
+func (e *TestEngine) createTestContainer(ctx context.Context, owner, repo, branch string) (ContainerInterface, error) {
 	// Create a container for testing
 	repoURL := fmt.Sprintf("https://github.com/%s/%s", owner, repo)
 
-	container := dag.Container().
+	container := e.containerProvider.CreateContainer().
 		From("ubuntu:22.04").
 		WithExec([]string{"apt-get", "update"}).
 		WithExec([]string{"apt-get", "install", "-y", "git", "curl", "wget", "build-essential"}).
@@ -221,7 +227,7 @@ func (e *TestEngine) createTestContainer(ctx context.Context, owner, repo, branc
 	return container, nil
 }
 
-func (e *TestEngine) detectFramework(ctx context.Context, container *dagger.Container) (*TestFramework, error) {
+func (e *TestEngine) detectFramework(ctx context.Context, container ContainerInterface) (*TestFramework, error) {
 	// Check for various framework indicators
 	files := []string{"package.json", "go.mod", "pom.xml", "requirements.txt", "Cargo.toml", "composer.json"}
 
@@ -266,7 +272,7 @@ func (e *TestEngine) getFrameworkByFile(filename string) *TestFramework {
 	}
 }
 
-func (e *TestEngine) runLinting(ctx context.Context, container *dagger.Container, framework *TestFramework) (string, error) {
+func (e *TestEngine) runLinting(ctx context.Context, container ContainerInterface, framework *TestFramework) (string, error) {
 	if framework.LintCommand == "" {
 		return "No linting configured", nil
 	}
@@ -286,7 +292,7 @@ func (e *TestEngine) runLinting(ctx context.Context, container *dagger.Container
 	return output, nil
 }
 
-func (e *TestEngine) runBuild(ctx context.Context, container *dagger.Container, framework *TestFramework) (string, error) {
+func (e *TestEngine) runBuild(ctx context.Context, container ContainerInterface, framework *TestFramework) (string, error) {
 	if framework.BuildCommand == "" {
 		return "No build configured", nil
 	}
@@ -306,7 +312,7 @@ func (e *TestEngine) runBuild(ctx context.Context, container *dagger.Container, 
 	return output, nil
 }
 
-func (e *TestEngine) runTestSuite(ctx context.Context, container *dagger.Container, framework *TestFramework) (string, error) {
+func (e *TestEngine) runTestSuite(ctx context.Context, container ContainerInterface, framework *TestFramework) (string, error) {
 	e.logger.WithField("command", framework.TestCommand).Debug("Running test suite")
 
 	// Setup environment
@@ -328,7 +334,7 @@ type CoverageResult struct {
 	ReportFormat string                 `json:"report_format"`
 }
 
-func (e *TestEngine) runCoverageAnalysis(ctx context.Context, container *dagger.Container, framework *TestFramework) (*CoverageResult, error) {
+func (e *TestEngine) runCoverageAnalysis(ctx context.Context, container ContainerInterface, framework *TestFramework) (*CoverageResult, error) {
 	if framework.CoverageCommand == "" {
 		return &CoverageResult{Coverage: 0.0}, nil
 	}
