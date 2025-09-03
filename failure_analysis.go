@@ -162,23 +162,40 @@ func (e *FailureAnalysisEngine) preClassifyFailure(ctx FailureContext) *FailureC
 		allLogs = ctx.Logs.RawLogs
 	}
 
-	// Check against known patterns
-	for patternName, rule := range e.patterns.Patterns {
-		if strings.Contains(errorLines, rule.Pattern) || strings.Contains(allLogs, rule.Pattern) {
-			e.logger.WithField("pattern", patternName).Debug("Matched error pattern")
+	// Check against known patterns, sorted by pattern length (longest first) for specificity
+	type patternEntry struct {
+		name string
+		rule *ErrorPatternRule
+	}
+	var patterns []patternEntry
+	for name, rule := range e.patterns.Patterns {
+		patterns = append(patterns, patternEntry{name, rule})
+	}
+	// Sort by pattern length descending to match more specific patterns first
+	for i := 0; i < len(patterns)-1; i++ {
+		for j := i + 1; j < len(patterns); j++ {
+			if len(patterns[i].rule.Pattern) < len(patterns[j].rule.Pattern) {
+				patterns[i], patterns[j] = patterns[j], patterns[i]
+			}
+		}
+	}
+	
+	for _, entry := range patterns {
+		if strings.Contains(errorLines, entry.rule.Pattern) || strings.Contains(allLogs, entry.rule.Pattern) {
+			e.logger.WithField("pattern", entry.name).Debug("Matched error pattern")
 			return &FailureClassification{
-				Type:       rule.Type,
-				Severity:   rule.Severity,
-				Category:   rule.Category,
-				Confidence: rule.Confidence,
-				Tags:       rule.Tags,
+				Type:       entry.rule.Type,
+				Severity:   entry.rule.Severity,
+				Category:   entry.rule.Category,
+				Confidence: entry.rule.Confidence,
+				Tags:       entry.rule.Tags,
 			}
 		}
 	}
 
 	// Default classification if no pattern matches
 	return &FailureClassification{
-		Type:       CodeFailure,
+		Type:       InfrastructureFailure,
 		Severity:   Medium,
 		Category:   Systematic,
 		Confidence: 0.3,
@@ -208,7 +225,7 @@ func (e *FailureAnalysisEngine) buildAnalysisPrompt(ctx FailureContext, preClass
 	}
 
 	// Pre-classification
-	prompt.WriteString(fmt.Sprintf("**Initial Classification**: %s (confidence: %.2f)\n\n", preClass.Type, preClass.Confidence))
+	prompt.WriteString(fmt.Sprintf("**Initial Classification**: %s (confidence: %.2f)\n\n", preClass.Type.DisplayName(), preClass.Confidence))
 
 	// Error logs
 	prompt.WriteString("## Error Information\n\n")
@@ -269,7 +286,7 @@ func (e *FailureAnalysisEngine) buildFixGenerationPrompt(analysis *FailureAnalys
 	prompt.WriteString("## Fix Generation for CI/CD Failure\n\n")
 
 	// Analysis summary
-	prompt.WriteString(fmt.Sprintf("**Failure Type**: %s\n", analysis.Classification.Type))
+	prompt.WriteString(fmt.Sprintf("**Failure Type**: %s\n", analysis.Classification.Type.DisplayName()))
 	prompt.WriteString(fmt.Sprintf("**Root Cause**: %s\n", analysis.RootCause))
 	prompt.WriteString(fmt.Sprintf("**Description**: %s\n\n", analysis.Description))
 
@@ -317,6 +334,11 @@ func (e *FailureAnalysisEngine) buildFixGenerationPrompt(analysis *FailureAnalys
 
 // parseAnalysisResponse parses the LLM response into a structured analysis result
 func (e *FailureAnalysisEngine) parseAnalysisResponse(content string, ctx FailureContext) (*FailureAnalysisResult, error) {
+	// Return error for empty content
+	if strings.TrimSpace(content) == "" {
+		return nil, fmt.Errorf("empty response content")
+	}
+	
 	// Try to extract JSON from the response
 	jsonStart := strings.Index(content, "{")
 	jsonEnd := strings.LastIndex(content, "}")
@@ -380,12 +402,33 @@ func (e *FailureAnalysisEngine) parseAnalysisResponse(content string, ctx Failur
 
 // parseUnstructuredAnalysis parses unstructured LLM response
 func (e *FailureAnalysisEngine) parseUnstructuredAnalysis(content string, ctx FailureContext) (*FailureAnalysisResult, error) {
+	// Try to detect failure type from content
+	contentLower := strings.ToLower(content)
+	var failureType FailureType = CodeFailure
+	
+	// Simple pattern matching for unstructured content
+	if strings.Contains(contentLower, "dependency") || strings.Contains(contentLower, "dependencies") ||
+	   strings.Contains(contentLower, "package") {
+		failureType = DependencyFailure
+	} else if strings.Contains(contentLower, "build") || strings.Contains(contentLower, "compilation") {
+		failureType = BuildFailure
+	} else if strings.Contains(contentLower, "test") {
+		failureType = TestFailure
+	} else if strings.Contains(contentLower, "infrastructure") || strings.Contains(contentLower, "network") ||
+	         strings.Contains(contentLower, "timeout") {
+		failureType = InfrastructureFailure
+	} else if strings.Contains(contentLower, "security") || strings.Contains(contentLower, "vulnerability") {
+		failureType = SecurityFailure
+	} else if strings.Contains(contentLower, "configuration") || strings.Contains(contentLower, "config") {
+		failureType = ConfigurationFailure
+	}
+	
 	// Fallback parsing for unstructured responses
 	analysis := &FailureAnalysisResult{
 		Description: content,
 		RootCause:   "Analysis provided in description field",
 		Classification: FailureClassification{
-			Type:       CodeFailure,
+			Type:       failureType,
 			Severity:   Medium,
 			Category:   Systematic,
 			Confidence: 0.5,
@@ -546,15 +589,25 @@ func getStringArrayField(data map[string]interface{}, key string) []string {
 func loadErrorPatterns() *ErrorPatternDatabase {
 	return &ErrorPatternDatabase{
 		Patterns: map[string]*ErrorPatternRule{
-			"npm_install_failure": {
-				Pattern:     "npm install",
-				Type:        DependencyFailure,
+			"connection_timeout": {
+				Pattern:     "connection timeout",
+				Type:        InfrastructureFailure,
+				Category:    Environmental,
+				Severity:    High,
+				Description: "Network connection timeout",
+				Solutions:   []string{"Check network connectivity", "Increase timeout", "Retry connection"},
+				Confidence:  0.8,
+				Tags:        []string{"network", "timeout", "infrastructure"},
+			},
+			"build_failure": {
+				Pattern:     "build failed",
+				Type:        BuildFailure,
 				Category:    Systematic,
 				Severity:    High,
-				Description: "NPM package installation failure",
-				Solutions:   []string{"Check package.json", "Clear node_modules", "Update npm version"},
+				Description: "Build compilation failure",
+				Solutions:   []string{"Check syntax errors", "Update dependencies", "Fix import paths"},
 				Confidence:  0.8,
-				Tags:        []string{"npm", "dependency", "nodejs"},
+				Tags:        []string{"build", "compilation"},
 			},
 			"go_build_failure": {
 				Pattern:     "go build",
@@ -566,6 +619,26 @@ func loadErrorPatterns() *ErrorPatternDatabase {
 				Confidence:  0.8,
 				Tags:        []string{"go", "build", "compilation"},
 			},
+			"test_failure": {
+				Pattern:     "test failed",
+				Type:        TestFailure,
+				Category:    Systematic,
+				Severity:    Medium,
+				Description: "Test execution failure",
+				Solutions:   []string{"Fix test logic", "Update test expectations", "Check test dependencies"},
+				Confidence:  0.8,
+				Tags:        []string{"test", "failure"},
+			},
+			"npm_install_failure": {
+				Pattern:     "npm install",
+				Type:        DependencyFailure,
+				Category:    Systematic,
+				Severity:    High,
+				Description: "NPM package installation failure",
+				Solutions:   []string{"Check package.json", "Clear node_modules", "Update npm version"},
+				Confidence:  0.8,
+				Tags:        []string{"npm", "dependency", "nodejs"},
+			},
 			"test_timeout": {
 				Pattern:     "timeout",
 				Type:        TestFailure,
@@ -575,6 +648,16 @@ func loadErrorPatterns() *ErrorPatternDatabase {
 				Solutions:   []string{"Increase timeout", "Optimize test performance", "Check for infinite loops"},
 				Confidence:  0.7,
 				Tags:        []string{"timeout", "test", "performance"},
+			},
+			"service_unavailable": {
+				Pattern:     "service unavailable",
+				Type:        InfrastructureFailure,
+				Category:    Environmental,
+				Severity:    High,
+				Description: "Service availability issue",
+				Solutions:   []string{"Check service status", "Verify endpoints", "Check dependencies"},
+				Confidence:  0.8,
+				Tags:        []string{"service", "availability", "infrastructure"},
 			},
 			"docker_build_failure": {
 				Pattern:     "docker build",
@@ -595,6 +678,46 @@ func loadErrorPatterns() *ErrorPatternDatabase {
 				Solutions:   []string{"Increase memory limits", "Optimize memory usage", "Check for memory leaks"},
 				Confidence:  0.9,
 				Tags:        []string{"memory", "resource", "performance"},
+			},
+			"security_vulnerability": {
+				Pattern:     "security vulnerability",
+				Type:        SecurityFailure,
+				Category:    Systematic,
+				Severity:    Critical,
+				Description: "Security vulnerability detected",
+				Solutions:   []string{"Update vulnerable dependencies", "Apply security patches", "Review security policies"},
+				Confidence:  0.9,
+				Tags:        []string{"security", "vulnerability"},
+			},
+			"insecure_dependency": {
+				Pattern:     "insecure dependency",
+				Type:        SecurityFailure,
+				Category:    Systematic,
+				Severity:    High,
+				Description: "Insecure dependency detected",
+				Solutions:   []string{"Update dependency", "Replace with secure alternative", "Add security controls"},
+				Confidence:  0.8,
+				Tags:        []string{"security", "dependency"},
+			},
+			"invalid_configuration": {
+				Pattern:     "invalid configuration",
+				Type:        ConfigurationFailure,
+				Category:    Systematic,
+				Severity:    Medium,
+				Description: "Configuration validation failure",
+				Solutions:   []string{"Fix configuration syntax", "Update config values", "Check config schema"},
+				Confidence:  0.8,
+				Tags:        []string{"configuration", "validation"},
+			},
+			"config_file_not_found": {
+				Pattern:     "config file not found",
+				Type:        ConfigurationFailure,
+				Category:    Systematic,
+				Severity:    Medium,
+				Description: "Configuration file missing",
+				Solutions:   []string{"Create missing config file", "Fix file path", "Check file permissions"},
+				Confidence:  0.8,
+				Tags:        []string{"configuration", "file", "missing"},
 			},
 		},
 	}

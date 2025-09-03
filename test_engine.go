@@ -254,8 +254,14 @@ func (e *TestEngine) getFrameworkByFile(filename string) *TestFramework {
 		return e.testFrameworks["rust"]
 	case "composer.json":
 		return e.testFrameworks["php"]
+	case "Makefile", "makefile":
+		return e.testFrameworks["generic"]
 	default:
-		// Return nil for unknown files instead of generic
+		// For truly unknown files, check if it's a generic build file pattern
+		if strings.HasSuffix(filename, ".file") || strings.Contains(filename, "Makefile") {
+			return e.testFrameworks["generic"]
+		}
+		// Return nil for unknown file extensions
 		return nil
 	}
 }

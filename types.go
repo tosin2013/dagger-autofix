@@ -92,6 +92,30 @@ const (
 	SecurityFailure       FailureType = "security"
 )
 
+// DisplayName returns the display name for the failure type
+func (f FailureType) DisplayName() string {
+	switch f {
+	case InfrastructureFailure:
+		return "InfrastructureFailure"
+	case CodeFailure:
+		return "CodeFailure"
+	case TestFailure:
+		return "TestFailure"
+	case DependencyFailure:
+		return "DependencyFailure"
+	case BuildFailure:
+		return "BuildFailure"
+	case DeploymentFailure:
+		return "DeploymentFailure"
+	case ConfigurationFailure:
+		return "ConfigurationFailure"
+	case SecurityFailure:
+		return "SecurityFailure"
+	default:
+		return string(f)
+	}
+}
+
 // SeverityLevel represents the severity of a failure
 type SeverityLevel string
 
