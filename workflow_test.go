@@ -90,7 +90,7 @@ func (m *mockPullRequestEngine) CreateFixPR(ctx context.Context, analysis *Failu
 
 // Tests
 
-func TestMonitorWorkflows(t *testing.T) {
+func TestWorkflowMonitorWorkflows(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -130,7 +130,7 @@ func TestMonitorWorkflows(t *testing.T) {
 	}
 }
 
-func TestAnalyzeFailure(t *testing.T) {
+func TestWorkflowAnalyzeFailure(t *testing.T) {
 	ctx := context.Background()
 	run := &WorkflowRun{ID: 123}
 	logs := &WorkflowLogs{ErrorLines: []string{"error"}}
@@ -164,7 +164,7 @@ func TestAnalyzeFailure(t *testing.T) {
 	assert.Equal(t, expected, res)
 }
 
-func TestAutoFix(t *testing.T) {
+func TestWorkflowAutoFix(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("successful autofix", func(t *testing.T) {
@@ -277,7 +277,7 @@ func TestAutoFix(t *testing.T) {
 	})
 }
 
-func TestValidateFix(t *testing.T) {
+func TestWorkflowValidateFix(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("success", func(t *testing.T) {

@@ -356,7 +356,7 @@ func TestParseUnstructuredFixes(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Len(t, fixes, 1) // Actual implementation returns 1 fix combining all
-	
+
 	for _, fix := range fixes {
 		assert.NotEmpty(t, fix.ID)
 		assert.NotEmpty(t, fix.Description)
@@ -370,9 +370,9 @@ func TestEnhanceWithPatterns(t *testing.T) {
 	engine := NewFailureAnalysisEngine(nil, logger)
 
 	analysis := &FailureAnalysisResult{
-		ID:             "test-analysis",
-		ErrorPatterns:  []ErrorPattern{},
-		AffectedFiles:  []string{},
+		ID:            "test-analysis",
+		ErrorPatterns: []ErrorPattern{},
+		AffectedFiles: []string{},
 	}
 
 	preClass := &FailureClassification{
@@ -427,7 +427,7 @@ func (m *mockLLMClient) Chat(ctx context.Context, req *LLMRequest) (*LLMResponse
 // TestAnalyzeFailure tests the AnalyzeFailure method with mock LLM client
 func TestAnalyzeFailure(t *testing.T) {
 	logger := logrus.New()
-	
+
 	tests := []struct {
 		name        string
 		mockResp    *LLMResponse
@@ -465,7 +465,7 @@ func TestAnalyzeFailure(t *testing.T) {
 		{
 			name: "Successful analysis with unstructured response",
 			mockResp: &LLMResponse{
-				Content: `The build failure is caused by a missing dependency. The package.json file is missing the lodash package which is required by src/utils.js. This is a systematic dependency failure that should be easy to fix by adding the package to dependencies.`,
+				Content:  `The build failure is caused by a missing dependency. The package.json file is missing the lodash package which is required by src/utils.js. This is a systematic dependency failure that should be easy to fix by adding the package to dependencies.`,
 				Provider: "anthropic",
 				Model:    "claude-3",
 			},
@@ -549,7 +549,7 @@ func TestAnalyzeFailure(t *testing.T) {
 				assert.Equal(t, failureCtx, result.Context)
 				assert.NotZero(t, result.Timestamp)
 				assert.NotZero(t, result.ProcessingTime)
-				
+
 				// Verify classification
 				assert.NotEmpty(t, result.Classification.Type)
 				assert.Greater(t, result.Classification.Confidence, 0.0)
@@ -562,12 +562,12 @@ func TestAnalyzeFailure(t *testing.T) {
 // TestGenerateFixes tests the GenerateFixes method with mock LLM client
 func TestGenerateFixes(t *testing.T) {
 	logger := logrus.New()
-	
+
 	tests := []struct {
-		name         string
-		mockResp     *LLMResponse
-		mockErr      error
-		expectError  bool
+		name          string
+		mockResp      *LLMResponse
+		mockErr       error
+		expectError   bool
 		expectedFixes int
 	}{
 		{
@@ -692,7 +692,7 @@ Fix 3: Check if lodash is actually needed or can be removed`,
 			} else {
 				assert.NoError(t, err)
 				assert.Len(t, fixes, tt.expectedFixes)
-				
+
 				for _, fix := range fixes {
 					assert.NotEmpty(t, fix.ID)
 					assert.NotEmpty(t, fix.Description)

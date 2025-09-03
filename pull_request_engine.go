@@ -21,25 +21,25 @@ type PullRequestEngine struct {
 
 // PRTemplates contains templates for pull request content
 type PRTemplates struct {
-	Title       string `json:"title"`
-	Body        string `json:"body"`
-	CommitMsg   string `json:"commit_message"`
-	Labels      []string `json:"labels"`
-	Reviewers   []string `json:"reviewers"`
+	Title     string   `json:"title"`
+	Body      string   `json:"body"`
+	CommitMsg string   `json:"commit_message"`
+	Labels    []string `json:"labels"`
+	Reviewers []string `json:"reviewers"`
 }
 
 // PRCreationOptions contains options for PR creation
 type PRCreationOptions struct {
-	BranchName      string   `json:"branch_name"`
-	TargetBranch    string   `json:"target_branch"`
-	Title           string   `json:"title"`
-	Body            string   `json:"body"`
-	Labels          []string `json:"labels"`
-	Reviewers       []string `json:"reviewers"`
-	Assignees       []string `json:"assignees"`
-	Draft           bool     `json:"draft"`
-	AutoMerge       bool     `json:"auto_merge"`
-	DeleteBranch    bool     `json:"delete_branch"`
+	BranchName   string   `json:"branch_name"`
+	TargetBranch string   `json:"target_branch"`
+	Title        string   `json:"title"`
+	Body         string   `json:"body"`
+	Labels       []string `json:"labels"`
+	Reviewers    []string `json:"reviewers"`
+	Assignees    []string `json:"assignees"`
+	Draft        bool     `json:"draft"`
+	AutoMerge    bool     `json:"auto_merge"`
+	DeleteBranch bool     `json:"delete_branch"`
 }
 
 // NewPullRequestEngine creates a new pull request engine

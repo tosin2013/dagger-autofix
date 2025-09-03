@@ -13,8 +13,8 @@ import (
 
 // Constants for improved code quality
 const (
-	DefaultTimeout         = 30 * time.Second
-	MaxLogSize            = 10 * 1024 * 1024 // 10MB
+	DefaultTimeout       = 30 * time.Second
+	MaxLogSize           = 10 * 1024 * 1024 // 10MB
 	MaxRetries           = 3
 	RetryBackoffDuration = 2 * time.Second
 	MaxConcurrentOps     = 10
@@ -31,13 +31,13 @@ const (
 
 //nolint:unused // Infrastructure code for future use
 type EnhancedFailureAnalysisEngine struct {
-	llmClient      *LLMClient      //nolint:unused
-	logger         *logrus.Logger  //nolint:unused
-	patterns       *ErrorPatternDatabase //nolint:unused
-	prompts        *PromptTemplates //nolint:unused
-	cache          *AnalysisCache  //nolint:unused
-	rateLimiter    *RateLimiter    //nolint:unused
-	metrics        *EngineMetrics  //nolint:unused
+	llmClient   *LLMClient            //nolint:unused
+	logger      *logrus.Logger        //nolint:unused
+	patterns    *ErrorPatternDatabase //nolint:unused
+	prompts     *PromptTemplates      //nolint:unused
+	cache       *AnalysisCache        //nolint:unused
+	rateLimiter *RateLimiter          //nolint:unused
+	metrics     *EngineMetrics        //nolint:unused
 }
 
 // AnalysisCache provides caching for repeated analysis
@@ -55,22 +55,22 @@ type CacheEntry struct {
 
 // RateLimiter provides API rate limiting
 type RateLimiter struct {
-	mu       sync.Mutex
-	tokens   int
-	maxTokens int
+	mu         sync.Mutex
+	tokens     int
+	maxTokens  int
 	refillRate time.Duration
 	lastRefill time.Time
 }
 
 //nolint:unused // Infrastructure code for future use
 type EngineMetrics struct {
-	mu                    sync.RWMutex //nolint:unused
-	totalAnalyses        int64        //nolint:unused
-	successfulAnalyses   int64        //nolint:unused
-	failedAnalyses       int64        //nolint:unused
-	averageResponseTime  time.Duration //nolint:unused
-	cacheHits            int64        //nolint:unused
-	cacheMisses          int64        //nolint:unused
+	mu                  sync.RWMutex  //nolint:unused
+	totalAnalyses       int64         //nolint:unused
+	successfulAnalyses  int64         //nolint:unused
+	failedAnalyses      int64         //nolint:unused
+	averageResponseTime time.Duration //nolint:unused
+	cacheHits           int64         //nolint:unused
+	cacheMisses         int64         //nolint:unused
 }
 
 //nolint:unused // Infrastructure function for future use
@@ -78,15 +78,15 @@ func validateAndSanitizeInput(input string) (string, error) {
 	if len(input) == 0 {
 		return "", fmt.Errorf("input cannot be empty")
 	}
-	
+
 	if len(input) > MaxLogSize {
 		return "", fmt.Errorf("input too large: %d bytes exceeds maximum %d bytes", len(input), MaxLogSize)
 	}
-	
+
 	// Sanitize input to prevent log injection
 	sanitized := strings.ReplaceAll(input, "\r", "\\r")
 	sanitized = strings.ReplaceAll(sanitized, "\n", "\\n")
-	
+
 	// Remove control characters except newlines and tabs
 	var result strings.Builder
 	for _, r := range sanitized {
@@ -94,7 +94,7 @@ func validateAndSanitizeInput(input string) (string, error) {
 			result.WriteRune(r)
 		}
 	}
-	
+
 	return result.String(), nil
 }
 
@@ -103,17 +103,17 @@ func wrapError(err error, operation string, context map[string]interface{}) erro
 	if err == nil {
 		return nil
 	}
-	
+
 	var contextStr strings.Builder
 	contextStr.WriteString(operation)
-	
+
 	if len(context) > 0 {
 		contextStr.WriteString(" with context: ")
 		for k, v := range context {
 			contextStr.WriteString(fmt.Sprintf("%s=%v ", k, v))
 		}
 	}
-	
+
 	return fmt.Errorf("%s: %w", contextStr.String(), err)
 }
 
@@ -122,7 +122,7 @@ func processLogsInChunks(logs io.Reader, chunkSize int, processor func([]byte) e
 	if chunkSize <= 0 {
 		chunkSize = 64 * 1024 // Default 64KB chunks
 	}
-	
+
 	buffer := make([]byte, chunkSize)
 	for {
 		n, err := logs.Read(buffer)
@@ -134,37 +134,37 @@ func processLogsInChunks(logs io.Reader, chunkSize int, processor func([]byte) e
 				"chunk_size": chunkSize,
 			})
 		}
-		
+
 		if err := processor(buffer[:n]); err != nil {
 			return wrapError(err, "processing log chunk", map[string]interface{}{
 				"chunk_size": n,
 			})
 		}
 	}
-	
+
 	return nil
 }
 
 //nolint:unused // Infrastructure function for future use
 func retryWithBackoff(ctx context.Context, operation func() error, maxRetries int, baseDelay time.Duration) error {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		
+
 		if err := operation(); err != nil {
 			lastErr = err
-			
+
 			if attempt < maxRetries {
 				delay := time.Duration(1<<uint(attempt)) * baseDelay
 				if delay > 30*time.Second {
 					delay = 30 * time.Second
 				}
-				
+
 				select {
 				case <-time.After(delay):
 					continue
@@ -176,10 +176,10 @@ func retryWithBackoff(ctx context.Context, operation func() error, maxRetries in
 			return nil
 		}
 	}
-	
+
 	return wrapError(lastErr, "operation failed after retries", map[string]interface{}{
 		"max_retries": maxRetries,
-		"attempts": maxRetries + 1,
+		"attempts":    maxRetries + 1,
 	})
 }
 
@@ -195,19 +195,19 @@ func NewAnalysisCache(maxSize int, defaultTTL time.Duration) *AnalysisCache {
 func (c *AnalysisCache) Get(key string) (*FailureAnalysisResult, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	entry, exists := c.cache[key]
 	if !exists {
 		return nil, false
 	}
-	
+
 	// Check TTL
 	if time.Since(entry.timestamp) > entry.ttl {
 		// Entry expired, remove it
 		delete(c.cache, key)
 		return nil, false
 	}
-	
+
 	return entry.result, true
 }
 
@@ -215,12 +215,12 @@ func (c *AnalysisCache) Get(key string) (*FailureAnalysisResult, bool) {
 func (c *AnalysisCache) Set(key string, result *FailureAnalysisResult, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	// If cache is full, remove oldest entry
 	if len(c.cache) >= c.maxSize {
 		c.evictOldest()
 	}
-	
+
 	c.cache[key] = &CacheEntry{
 		result:    result,
 		timestamp: time.Now(),
@@ -232,7 +232,7 @@ func (c *AnalysisCache) evictOldest() {
 	var oldestKey string
 	var oldestTime time.Time
 	first := true
-	
+
 	for key, entry := range c.cache {
 		if first || entry.timestamp.Before(oldestTime) {
 			oldestKey = key
@@ -240,7 +240,7 @@ func (c *AnalysisCache) evictOldest() {
 			first = false
 		}
 	}
-	
+
 	if oldestKey != "" {
 		delete(c.cache, oldestKey)
 	}
@@ -260,22 +260,22 @@ func NewRateLimiter(maxTokens int, refillRate time.Duration) *RateLimiter {
 func (rl *RateLimiter) Allow() bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	
+
 	now := time.Now()
 	elapsed := now.Sub(rl.lastRefill)
-	
+
 	// Refill tokens based on elapsed time
 	if elapsed >= rl.refillRate {
 		tokensToAdd := int(elapsed / rl.refillRate)
 		rl.tokens = min(rl.maxTokens, rl.tokens+tokensToAdd)
 		rl.lastRefill = now
 	}
-	
+
 	if rl.tokens > 0 {
 		rl.tokens--
 		return true
 	}
-	
+
 	return false
 }
 
@@ -291,12 +291,12 @@ func validateRunID(runID int64) error {
 	if runID <= 0 {
 		return fmt.Errorf("invalid run ID: %d, must be positive", runID)
 	}
-	
+
 	// GitHub run IDs are typically large integers
 	if runID < 1000000 {
 		return fmt.Errorf("run ID %d appears invalid, expected GitHub Actions run ID", runID)
 	}
-	
+
 	return nil
 }
 
@@ -305,16 +305,16 @@ func validateRepositoryName(owner, name string) error {
 	if owner == "" {
 		return fmt.Errorf("repository owner cannot be empty")
 	}
-	
+
 	if name == "" {
 		return fmt.Errorf("repository name cannot be empty")
 	}
-	
+
 	// GitHub repository names have specific rules
 	if len(owner) > 39 || len(name) > 100 {
 		return fmt.Errorf("repository owner/name too long: %s/%s", owner, name)
 	}
-	
+
 	// Check for invalid characters (simplified)
 	invalidChars := []string{" ", ".", "..", "~", "^", ":", "?", "*", "[", "\\"}
 	for _, char := range invalidChars {
@@ -322,21 +322,21 @@ func validateRepositoryName(owner, name string) error {
 			return fmt.Errorf("repository owner/name contains invalid character '%s': %s/%s", char, owner, name)
 		}
 	}
-	
+
 	return nil
 }
 
 //nolint:unused // Infrastructure function for future use
 func validateLLMProvider(provider LLMProvider) error {
 	validProviders := []LLMProvider{OpenAI, Anthropic, Gemini, DeepSeek, LiteLLM}
-	
+
 	for _, validProvider := range validProviders {
 		if provider == validProvider {
 			return nil
 		}
 	}
-	
-	return fmt.Errorf("unsupported LLM provider: %s, supported providers: %v", 
+
+	return fmt.Errorf("unsupported LLM provider: %s, supported providers: %v",
 		provider, validProviders)
 }
 
@@ -345,13 +345,13 @@ func createTimeoutContext(parent context.Context, operation string, timeout time
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	
+
 	ctx, cancel := context.WithTimeout(parent, timeout)
-	
+
 	// Add operation info to context for better debugging
 	ctx = context.WithValue(ctx, operationContextKey, operation)
 	ctx = context.WithValue(ctx, timeoutContextKey, timeout)
-	
+
 	return ctx, cancel
 }
 
@@ -376,7 +376,7 @@ func (rm *ResourceManager) Add(resource io.Closer) {
 func (rm *ResourceManager) Cleanup() {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	for _, resource := range rm.resources {
 		if resource != nil {
 			if err := resource.Close(); err != nil {
@@ -385,7 +385,7 @@ func (rm *ResourceManager) Cleanup() {
 			}
 		}
 	}
-	
+
 	rm.resources = rm.resources[:0]
 }
 
@@ -418,7 +418,7 @@ func NewCircuitBreaker(maxFailures int, resetTimeout time.Duration) *CircuitBrea
 func (cb *CircuitBreaker) Execute(operation func() error) error {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	
+
 	switch cb.state {
 	case CircuitOpen:
 		if time.Since(cb.lastFailTime) > cb.resetTimeout {
@@ -431,31 +431,31 @@ func (cb *CircuitBreaker) Execute(operation func() error) error {
 	case CircuitClosed:
 		// Normal operation
 	}
-	
+
 	err := operation()
-	
+
 	if err != nil {
 		cb.failures++
 		cb.lastFailTime = time.Now()
-		
+
 		if cb.failures >= cb.maxFailures {
 			cb.state = CircuitOpen
 		}
-		
+
 		return err
 	}
-	
+
 	// Success - reset failures and close circuit
 	cb.failures = 0
 	cb.state = CircuitClosed
-	
+
 	return nil
 }
 
 // Graceful shutdown handler
 type GracefulShutdown struct {
 	shutdownFuncs []func() error
-	mu           sync.Mutex
+	mu            sync.Mutex
 }
 
 func NewGracefulShutdown() *GracefulShutdown {
@@ -473,18 +473,18 @@ func (gs *GracefulShutdown) AddShutdownFunc(f func() error) {
 func (gs *GracefulShutdown) Shutdown() error {
 	gs.mu.Lock()
 	defer gs.mu.Unlock()
-	
+
 	var errors []error
-	
+
 	for _, f := range gs.shutdownFuncs {
 		if err := f(); err != nil {
 			errors = append(errors, err)
 		}
 	}
-	
+
 	if len(errors) > 0 {
 		return fmt.Errorf("shutdown errors: %v", errors)
 	}
-	
+
 	return nil
 }

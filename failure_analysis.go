@@ -25,23 +25,23 @@ type ErrorPatternDatabase struct {
 
 // ErrorPatternRule defines a rule for matching and categorizing errors
 type ErrorPatternRule struct {
-	Pattern     string        `json:"pattern"`
-	Type        FailureType   `json:"type"`
+	Pattern     string          `json:"pattern"`
+	Type        FailureType     `json:"type"`
 	Category    FailureCategory `json:"category"`
-	Severity    SeverityLevel `json:"severity"`
-	Description string        `json:"description"`
-	Solutions   []string      `json:"solutions"`
-	Confidence  float64       `json:"confidence"`
-	Tags        []string      `json:"tags"`
+	Severity    SeverityLevel   `json:"severity"`
+	Description string          `json:"description"`
+	Solutions   []string        `json:"solutions"`
+	Confidence  float64         `json:"confidence"`
+	Tags        []string        `json:"tags"`
 }
 
 // PromptTemplates contains templates for different types of analysis
 type PromptTemplates struct {
-	FailureAnalysis   string `json:"failure_analysis"`
-	CodeAnalysis      string `json:"code_analysis"`
-	FixGeneration     string `json:"fix_generation"`
-	TestGeneration    string `json:"test_generation"`
-	SecurityAnalysis  string `json:"security_analysis"`
+	FailureAnalysis  string `json:"failure_analysis"`
+	CodeAnalysis     string `json:"code_analysis"`
+	FixGeneration    string `json:"fix_generation"`
+	TestGeneration   string `json:"test_generation"`
+	SecurityAnalysis string `json:"security_analysis"`
 }
 
 // NewFailureAnalysisEngine creates a new failure analysis engine
@@ -94,20 +94,20 @@ func (e *FailureAnalysisEngine) AnalyzeFailure(ctx context.Context, failureCtx F
 	analysis.ID = fmt.Sprintf("analysis-%d-%d", failureCtx.WorkflowRun.ID, time.Now().Unix())
 	analysis.Context = failureCtx
 	analysis.Timestamp = time.Now()
-	
+
 	// Set LLM provider if available
 	if realClient, ok := e.llmClient.(*LLMClient); ok {
 		analysis.LLMProvider = realClient.provider
 	} else {
 		analysis.LLMProvider = "mock" // For testing
 	}
-	
+
 	analysis.ProcessingTime = time.Since(start)
 
 	e.logger.WithFields(logrus.Fields{
-		"analysis_id": analysis.ID,
-		"failure_type": analysis.Classification.Type,
-		"confidence": analysis.Classification.Confidence,
+		"analysis_id":     analysis.ID,
+		"failure_type":    analysis.Classification.Type,
+		"confidence":      analysis.Classification.Confidence,
 		"processing_time": analysis.ProcessingTime,
 	}).Info("Failure analysis completed")
 
@@ -125,7 +125,7 @@ func (e *FailureAnalysisEngine) GenerateFixes(ctx context.Context, analysis *Fai
 		SystemMsg: e.prompts.FixGeneration,
 		Prompt:    fixPrompt,
 		Context: map[string]interface{}{
-			"analysis": analysis,
+			"analysis":     analysis,
 			"failure_type": analysis.Classification.Type,
 		},
 	}
@@ -179,7 +179,7 @@ func (e *FailureAnalysisEngine) preClassifyFailure(ctx FailureContext) *FailureC
 			}
 		}
 	}
-	
+
 	for _, entry := range patterns {
 		if strings.Contains(errorLines, entry.rule.Pattern) || strings.Contains(allLogs, entry.rule.Pattern) {
 			e.logger.WithField("pattern", entry.name).Debug("Matched error pattern")
@@ -338,11 +338,11 @@ func (e *FailureAnalysisEngine) parseAnalysisResponse(content string, ctx Failur
 	if strings.TrimSpace(content) == "" {
 		return nil, fmt.Errorf("empty response content")
 	}
-	
+
 	// Try to extract JSON from the response
 	jsonStart := strings.Index(content, "{")
 	jsonEnd := strings.LastIndex(content, "}")
-	
+
 	if jsonStart == -1 || jsonEnd == -1 {
 		return e.parseUnstructuredAnalysis(content, ctx)
 	}
@@ -405,24 +405,24 @@ func (e *FailureAnalysisEngine) parseUnstructuredAnalysis(content string, ctx Fa
 	// Try to detect failure type from content
 	contentLower := strings.ToLower(content)
 	var failureType FailureType = CodeFailure
-	
+
 	// Simple pattern matching for unstructured content
 	if strings.Contains(contentLower, "dependency") || strings.Contains(contentLower, "dependencies") ||
-	   strings.Contains(contentLower, "package") {
+		strings.Contains(contentLower, "package") {
 		failureType = DependencyFailure
 	} else if strings.Contains(contentLower, "build") || strings.Contains(contentLower, "compilation") {
 		failureType = BuildFailure
 	} else if strings.Contains(contentLower, "test") {
 		failureType = TestFailure
 	} else if strings.Contains(contentLower, "infrastructure") || strings.Contains(contentLower, "network") ||
-	         strings.Contains(contentLower, "timeout") {
+		strings.Contains(contentLower, "timeout") {
 		failureType = InfrastructureFailure
 	} else if strings.Contains(contentLower, "security") || strings.Contains(contentLower, "vulnerability") {
 		failureType = SecurityFailure
 	} else if strings.Contains(contentLower, "configuration") || strings.Contains(contentLower, "config") {
 		failureType = ConfigurationFailure
 	}
-	
+
 	// Fallback parsing for unstructured responses
 	analysis := &FailureAnalysisResult{
 		Description: content,
@@ -444,7 +444,7 @@ func (e *FailureAnalysisEngine) parseFixesResponse(content string, analysis *Fai
 	// Try to extract JSON array
 	jsonStart := strings.Index(content, "[")
 	jsonEnd := strings.LastIndex(content, "]")
-	
+
 	if jsonStart == -1 || jsonEnd == -1 {
 		return e.parseUnstructuredFixes(content, analysis)
 	}

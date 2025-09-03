@@ -58,12 +58,12 @@ func TestDaggerAutofix(t *testing.T) {
 // TestWithSource tests the WithSource method
 func TestWithSource(t *testing.T) {
 	module := New()
-	
+
 	// Test with nil source (should not panic)
 	result := module.WithSource(nil)
 	assert.NotNil(t, result)
 	assert.Nil(t, result.Source)
-	
+
 	// Test with mock directory (we can't create real dagger.Directory in tests)
 	// This mainly tests that the method works and returns the module
 	result2 := module.WithSource(nil) // Using nil as we can't create real dagger objects
@@ -86,7 +86,7 @@ func TestValidateConfigurationCases(t *testing.T) {
 			expectedError: "GitHub token is required",
 		},
 		{
-			name: "Missing repository info", 
+			name: "Missing repository info",
 			setupModule: func() *DaggerAutofix {
 				module := New()
 				module.GitHubToken = createTestSecret("github-token", "test-token")
@@ -137,18 +137,18 @@ func TestValidateConfigurationCases(t *testing.T) {
 // TestEnsureInitialized tests the ensureInitialized method
 func TestEnsureInitialized(t *testing.T) {
 	module := New()
-	
+
 	// Should return error when not initialized
 	err := module.ensureInitialized()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "module not initialized")
-	
+
 	// Set up valid configuration for initialization test
 	module.GitHubToken = createTestSecret("github-token", "test-token")
 	module.LLMAPIKey = createTestSecret("llm-key", "test-key")
 	module.RepoOwner = "owner"
 	module.RepoName = "repo"
-	
+
 	// Note: We can't fully test initialization without Dagger context
 	// But we can test the validation part
 }
@@ -156,7 +156,7 @@ func TestEnsureInitialized(t *testing.T) {
 // TestShouldProcessRun tests the shouldProcessRun method
 func TestShouldProcessRun(t *testing.T) {
 	module := New()
-	
+
 	// Test with non-nil run (current implementation returns true)
 	run := &WorkflowRun{
 		ID:         123,
@@ -165,11 +165,11 @@ func TestShouldProcessRun(t *testing.T) {
 	}
 	result := module.shouldProcessRun(run)
 	assert.True(t, result) // Current implementation is simplified and returns true
-	
+
 	// Test with any run (current implementation returns true)
 	run = &WorkflowRun{
 		ID:         124,
-		Status:     "completed", 
+		Status:     "completed",
 		Conclusion: "success",
 	}
 	result = module.shouldProcessRun(run)
@@ -179,11 +179,11 @@ func TestShouldProcessRun(t *testing.T) {
 // TestSelectBestFix tests the selectBestFix method
 func TestSelectBestFix(t *testing.T) {
 	module := New()
-	
+
 	// Test with empty validations
 	result := module.selectBestFix([]*FixValidationResult{})
 	assert.Nil(t, result)
-	
+
 	// Test with single validation
 	validation1 := &FixValidationResult{
 		Fix: &ProposedFix{
@@ -196,7 +196,7 @@ func TestSelectBestFix(t *testing.T) {
 	}
 	result = module.selectBestFix([]*FixValidationResult{validation1})
 	assert.Equal(t, validation1, result)
-	
+
 	// Test with multiple validations - should select highest confidence
 	validation2 := &FixValidationResult{
 		Fix: &ProposedFix{
@@ -216,13 +216,11 @@ func TestSelectBestFix(t *testing.T) {
 		Valid:     true,
 		Timestamp: time.Now(),
 	}
-	
+
 	validations := []*FixValidationResult{validation1, validation2, validation3}
 	result = module.selectBestFix(validations)
 	assert.Equal(t, validation2, result) // Should select validation2 with highest confidence (0.9)
 }
-
-
 
 // TestFailureClassification tests failure type classification
 func TestFailureClassification(t *testing.T) {
@@ -309,8 +307,8 @@ func TestTestEngine(t *testing.T) {
 
 	t.Run("TestFrameworkDetection", func(t *testing.T) {
 		testCases := []struct {
-			filename string
-			expected string
+			filename    string
+			expected    string
 			shouldBeNil bool
 		}{
 			{"package.json", "nodejs", false},
@@ -683,21 +681,21 @@ func TestAutoFix(t *testing.T) {
 			}()
 			_, err = module.AutoFix(context.Background(), 12345)
 		}()
-		
+
 		assert.Error(t, err)
 		// Should either get a proper error or recover from panic
 		if err != nil {
 			// Accept either failure analysis error or panic recovery
 			errorStr := err.Error()
-			assert.True(t, 
-				strings.Contains(errorStr, "failure analysis failed") || 
-				strings.Contains(errorStr, "panic in AutoFix"),
+			assert.True(t,
+				strings.Contains(errorStr, "failure analysis failed") ||
+					strings.Contains(errorStr, "panic in AutoFix"),
 				"Expected either failure analysis error or panic, got: %s", errorStr)
 		}
 	})
 }
 
-// TestValidateFix tests the ValidateFix function  
+// TestValidateFix tests the ValidateFix function
 func TestValidateFix(t *testing.T) {
 	t.Run("ErrorWhenNotInitialized", func(t *testing.T) {
 		module := New()
@@ -731,15 +729,15 @@ func TestValidateFix(t *testing.T) {
 			}()
 			_, err = module.ValidateFix(context.Background(), fix)
 		}()
-		
+
 		assert.Error(t, err)
 		// Should either get a proper error or recover from panic
 		if err != nil {
 			errorStr := err.Error()
-			assert.True(t, 
-				strings.Contains(errorStr, "failed to create test branch") || 
-				strings.Contains(errorStr, "panic in ValidateFix") ||
-				strings.Contains(errorStr, "test execution failed"),
+			assert.True(t,
+				strings.Contains(errorStr, "failed to create test branch") ||
+					strings.Contains(errorStr, "panic in ValidateFix") ||
+					strings.Contains(errorStr, "test execution failed"),
 				"Expected branch creation, test execution error, or panic, got: %s", errorStr)
 		}
 	})
@@ -776,15 +774,15 @@ func TestValidateFix(t *testing.T) {
 			}()
 			_, err = module.ValidateFix(context.Background(), fix)
 		}()
-		
+
 		assert.Error(t, err)
 		// Test that the function accepts a properly structured fix but fails on infrastructure
 		if err != nil {
 			errorStr := err.Error()
-			assert.True(t, 
-				strings.Contains(errorStr, "failed to create test branch") || 
-				strings.Contains(errorStr, "panic in ValidateFix") ||
-				strings.Contains(errorStr, "test execution failed"),
+			assert.True(t,
+				strings.Contains(errorStr, "failed to create test branch") ||
+					strings.Contains(errorStr, "panic in ValidateFix") ||
+					strings.Contains(errorStr, "test execution failed"),
 				"Expected infrastructure error or panic, got: %s", errorStr)
 		}
 	})
@@ -819,7 +817,7 @@ func TestInitialize(t *testing.T) {
 			}()
 			result, err = module.Initialize(context.Background())
 		}()
-		
+
 		// Should either error or succeed (depending on token validation logic)
 		// The actual behavior may vary based on implementation
 		if err == nil {
@@ -828,10 +826,10 @@ func TestInitialize(t *testing.T) {
 		} else {
 			// If it fails, ensure it's a reasonable error
 			errorStr := err.Error()
-			assert.True(t, 
+			assert.True(t,
 				strings.Contains(errorStr, "failed to initialize GitHub client") ||
-				strings.Contains(errorStr, "panic in Initialize") ||
-				strings.Contains(errorStr, "invalid GitHub token"),
+					strings.Contains(errorStr, "panic in Initialize") ||
+					strings.Contains(errorStr, "invalid GitHub token"),
 				"Expected GitHub client error or panic, got: %s", errorStr)
 		}
 	})
@@ -855,7 +853,7 @@ func TestInitialize(t *testing.T) {
 			}()
 			result, err = module.Initialize(context.Background())
 		}()
-		
+
 		// This should either fail or succeed depending on the implementation details
 		if err == nil {
 			// If it succeeds, make sure we got a result
@@ -863,9 +861,9 @@ func TestInitialize(t *testing.T) {
 		} else {
 			// If it fails, ensure it's a reasonable error
 			errorStr := err.Error()
-			assert.True(t, 
+			assert.True(t,
 				strings.Contains(errorStr, "failed to initialize") ||
-				strings.Contains(errorStr, "panic in Initialize"),
+					strings.Contains(errorStr, "panic in Initialize"),
 				"Expected initialization error or panic, got: %s", errorStr)
 		}
 	})
@@ -885,7 +883,7 @@ func TestGetMetrics(t *testing.T) {
 
 	t.Run("NotInitialized", func(t *testing.T) {
 		module := New()
-		
+
 		_, err := module.GetMetrics(context.Background())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "module not initialized")

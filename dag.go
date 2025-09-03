@@ -1,3 +1,4 @@
+//go:build !dagger
 // +build !dagger
 
 package main

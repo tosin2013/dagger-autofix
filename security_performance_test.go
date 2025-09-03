@@ -1,19 +1,18 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
-	"crypto/rand"
-	"encoding/base64"
-	"net/http"
-	"net/http/httptest"
-	
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/sirupsen/logrus"
 )
 
 // TestSecurityValidation provides comprehensive security testing
@@ -32,7 +31,7 @@ func TestSecurityValidation(t *testing.T) {
 				description: "Valid OpenAI API key format",
 			},
 			{
-				name:        "ValidAnthropicKey", 
+				name:        "ValidAnthropicKey",
 				apiKey:      "sk-ant-api03-" + generateRandomString(40),
 				shouldPass:  true,
 				description: "Valid Anthropic API key format",
@@ -56,7 +55,7 @@ func TestSecurityValidation(t *testing.T) {
 				description: "API key with invalid characters",
 			},
 		}
-		
+
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				// Test API key validation (currently minimal, this documents needed improvements)
@@ -82,12 +81,12 @@ func TestSecurityValidation(t *testing.T) {
 			{"ControlChars", "input\x01\x02\x03control"},
 			{"LongInput", strings.Repeat("A", 10000)},
 		}
-		
+
 		for _, test := range maliciousInputs {
 			t.Run(test.name, func(t *testing.T) {
 				// Test that malicious inputs don't break the system
 				engine := NewFailureAnalysisEngine(nil, logrus.New())
-				
+
 				context := FailureContext{
 					Logs: &WorkflowLogs{
 						RawLogs:    test.input,
@@ -98,7 +97,7 @@ func TestSecurityValidation(t *testing.T) {
 						Name:  test.input,
 					},
 				}
-				
+
 				// Should not panic or cause security issues
 				classification := engine.preClassifyFailure(context)
 				assert.NotNil(t, classification)
@@ -116,14 +115,14 @@ func TestSecurityValidation(t *testing.T) {
 			fmt.Fprint(w, `{"error": "rate_limit_exceeded"}`)
 		}))
 		defer server.Close()
-		
+
 		// Test that rate limiting is handled gracefully
 		client := &http.Client{Timeout: 5 * time.Second}
 		resp, err := client.Get(server.URL)
-		
+
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
-		
+
 		// In a real implementation, we would test that the client
 		// respects rate limit headers and implements backoff
 		resp.Body.Close()
@@ -132,26 +131,26 @@ func TestSecurityValidation(t *testing.T) {
 	t.Run("SecretsHandling", func(t *testing.T) {
 		// Test that secrets are not logged or exposed
 		logger := logrus.New()
-		
+
 		// Capture log output
 		var logBuffer strings.Builder
 		logger.SetOutput(&logBuffer)
 		logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true})
-		
+
 		secretValue := "sk-proj-super-secret-key-12345"
-		
+
 		// Log with potential secret
 		logger.WithField("token", secretValue).Info("Processing request")
-		
+
 		logOutput := logBuffer.String()
-		
+
 		// Secret should not appear in logs (this test documents needed improvement)
 		// Currently, this would fail because we don't automatically mask secrets in logs
 		// This is a security improvement that should be implemented
-		
+
 		// For now, just check that logging doesn't panic
 		assert.NotEmpty(t, logOutput)
-		
+
 		// TODO: Implement secret masking and uncomment:
 		// assert.NotContains(t, logOutput, secretValue)
 	})
@@ -164,10 +163,10 @@ func TestSecurityValidation(t *testing.T) {
 			getProviderBaseURL(Gemini),
 			getProviderBaseURL(DeepSeek),
 		}
-		
+
 		for _, url := range externalURLs {
 			if !strings.Contains(url, "localhost") {
-				assert.True(t, strings.HasPrefix(url, "https://"), 
+				assert.True(t, strings.HasPrefix(url, "https://"),
 					"External URL should use HTTPS: %s", url)
 			}
 		}
@@ -180,16 +179,16 @@ func TestPerformanceValidation(t *testing.T) {
 		// Test memory usage patterns
 		const iterations = 100
 		modules := make([]*DaggerAutofix, 0, iterations)
-		
+
 		for i := 0; i < iterations; i++ {
 			module := New().
 				WithRepository(fmt.Sprintf("owner-%d", i), fmt.Sprintf("repo-%d", i))
 			modules = append(modules, module)
 		}
-		
+
 		// Verify all modules were created
 		assert.Len(t, modules, iterations)
-		
+
 		// Test memory cleanup
 		// In a real test, we would monitor actual memory usage
 	})
@@ -197,21 +196,21 @@ func TestPerformanceValidation(t *testing.T) {
 	t.Run("LargeDataProcessing", func(t *testing.T) {
 		// Test handling of large failure contexts
 		engine := NewFailureAnalysisEngine(nil, logrus.New())
-		
+
 		// Create large log content (1MB)
 		largeContent := strings.Repeat("ERROR: Test failure occurred\n", 25000)
-		
+
 		context := FailureContext{
 			Logs: &WorkflowLogs{
-				RawLogs: largeContent,
+				RawLogs:    largeContent,
 				ErrorLines: strings.Split(largeContent, "\n")[:1000], // Limit error lines
 			},
 		}
-		
+
 		start := time.Now()
 		classification := engine.preClassifyFailure(context)
 		duration := time.Since(start)
-		
+
 		// Should complete within reasonable time even with large data
 		assert.Less(t, duration, 5*time.Second)
 		assert.NotNil(t, classification)
@@ -220,20 +219,20 @@ func TestPerformanceValidation(t *testing.T) {
 	t.Run("ConcurrentAPICalls", func(t *testing.T) {
 		// Test concurrent API call handling
 		const numRoutines = 10
-		
+
 		results := make(chan error, numRoutines)
-		
+
 		for i := 0; i < numRoutines; i++ {
 			go func(id int) {
 				// Simulate concurrent operations
 				module := New().
 					WithRepository(fmt.Sprintf("owner-%d", id), "repo")
-				
+
 				err := module.validateConfiguration()
 				results <- err
 			}(i)
 		}
-		
+
 		// Collect results
 		for i := 0; i < numRoutines; i++ {
 			err := <-results
@@ -248,7 +247,7 @@ func TestComplexIntegrationScenarios(t *testing.T) {
 	t.Run("WorkflowAnalysisChain", func(t *testing.T) {
 		// Test complete analysis chain
 		engine := NewFailureAnalysisEngine(nil, logrus.New())
-		
+
 		// Multi-step failure scenario
 		context := FailureContext{
 			WorkflowRun: &WorkflowRun{
@@ -273,7 +272,7 @@ Build failed with exit code 1
 				},
 			},
 		}
-		
+
 		// Pre-classification should work
 		classification := engine.preClassifyFailure(context)
 		assert.NotNil(t, classification)
@@ -284,21 +283,21 @@ Build failed with exit code 1
 	t.Run("MultiFrameworkDetection", func(t *testing.T) {
 		// Test detection of multiple frameworks in a project
 		testEngine := NewTestEngine(85, logrus.New())
-		
+
 		frameworks := []string{
-			"package.json",   // Node.js
-			"go.mod",        // Go
+			"package.json",     // Node.js
+			"go.mod",           // Go
 			"requirements.txt", // Python
-			"pom.xml",       // Maven
+			"pom.xml",          // Maven
 		}
-		
+
 		detectedFrameworks := make(map[string]*TestFramework)
-		
+
 		for _, file := range frameworks {
 			framework := testEngine.getFrameworkByFile(file)
 			detectedFrameworks[file] = framework
 		}
-		
+
 		// Should detect all frameworks correctly
 		assert.Equal(t, "nodejs", detectedFrameworks["package.json"].Name)
 		assert.Equal(t, "golang", detectedFrameworks["go.mod"].Name)
@@ -309,14 +308,14 @@ Build failed with exit code 1
 	t.Run("ErrorRecoveryChain", func(t *testing.T) {
 		// Test error recovery in complex scenarios
 		_ = New()
-		
+
 		// Test graceful handling of multiple errors
 		errors := []error{
 			fmt.Errorf("network timeout"),
 			fmt.Errorf("authentication failed"),
 			fmt.Errorf("rate limit exceeded"),
 		}
-		
+
 		// In a real implementation, we would test that the system
 		// gracefully handles chains of errors and implements proper recovery
 		for _, err := range errors {
@@ -331,18 +330,18 @@ func TestConfigurationValidation(t *testing.T) {
 	t.Run("EnvironmentVariableOverrides", func(t *testing.T) {
 		// Test environment variable precedence
 		_ = NewCLI()
-		
+
 		// Test various configuration sources
 		testCases := []struct {
-			envVar     string
-			flagValue  string
-			expected   string
+			envVar    string
+			flagValue string
+			expected  string
 		}{
 			{"env-value", "", "env-value"},
 			{"env-value", "flag-value", "flag-value"}, // Flag should override env
 			{"", "flag-value", "flag-value"},
 		}
-		
+
 		for _, tc := range testCases {
 			// This tests the precedence logic in getStringValue
 			// Currently simplified, but documents the expected behavior
@@ -352,7 +351,7 @@ func TestConfigurationValidation(t *testing.T) {
 			} else if tc.envVar != "" {
 				result = tc.envVar
 			}
-			
+
 			assert.Equal(t, tc.expected, result)
 		}
 	})
@@ -392,21 +391,21 @@ func TestConfigurationValidation(t *testing.T) {
 				expectValid:    true, // Currently no validation, documents needed improvement
 			},
 		}
-		
+
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				module := New().WithRepository(tc.repoOwner, tc.repoName)
-				
+
 				if tc.hasGitHubToken {
 					module = module.WithGitHubToken(createTestSecret("github-token", "mock-token"))
 				}
-				
+
 				if tc.hasLLMKey {
 					module = module.WithLLMProvider("openai", createTestSecret("llm-key", "mock-key"))
 				}
-				
+
 				err := module.validateConfiguration()
-				
+
 				if tc.expectValid {
 					assert.NoError(t, err)
 				} else {
@@ -429,17 +428,17 @@ func TestEdgeCases(t *testing.T) {
 			"🚀 🔥 💯 Emoji test",
 			"Mixed: English 中文 Español 🚀",
 		}
-		
+
 		engine := NewFailureAnalysisEngine(nil, logrus.New())
-		
+
 		for _, text := range unicodeTests {
 			context := FailureContext{
 				Logs: &WorkflowLogs{
-					RawLogs: text,
+					RawLogs:    text,
 					ErrorLines: []string{text},
 				},
 			}
-			
+
 			// Should handle unicode without panic
 			classification := engine.preClassifyFailure(context)
 			assert.NotNil(t, classification)
@@ -449,15 +448,15 @@ func TestEdgeCases(t *testing.T) {
 	t.Run("ExtremelyLongInputs", func(t *testing.T) {
 		// Test handling of extremely long inputs
 		longInput := strings.Repeat("Very long error message that repeats many times. ", 1000)
-		
+
 		engine := NewFailureAnalysisEngine(nil, logrus.New())
 		context := FailureContext{
 			Logs: &WorkflowLogs{
-				RawLogs: longInput,
+				RawLogs:    longInput,
 				ErrorLines: []string{longInput},
 			},
 		}
-		
+
 		// Should handle long inputs gracefully
 		classification := engine.preClassifyFailure(context)
 		assert.NotNil(t, classification)
@@ -466,12 +465,12 @@ func TestEdgeCases(t *testing.T) {
 	t.Run("EmptyOrNilInputs", func(t *testing.T) {
 		// Test handling of empty or nil inputs
 		engine := NewFailureAnalysisEngine(nil, logrus.New())
-		
+
 		// Empty context
 		emptyContext := FailureContext{}
 		classification := engine.preClassifyFailure(emptyContext)
 		assert.NotNil(t, classification)
-		
+
 		// Nil logs
 		nilLogsContext := FailureContext{
 			Logs: nil,
@@ -502,7 +501,7 @@ func BenchmarkFailurePatternMatching(b *testing.B) {
 			RawLogs:    "npm install failed with error code 1\ngo build error: syntax error\ntest timeout after 30 seconds",
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = engine.preClassifyFailure(context)
@@ -511,20 +510,20 @@ func BenchmarkFailurePatternMatching(b *testing.B) {
 
 func BenchmarkLargeLogProcessing(b *testing.B) {
 	engine := NewFailureAnalysisEngine(nil, logrus.New())
-	
+
 	// Create large log content
 	logLines := make([]string, 1000)
 	for i := range logLines {
 		logLines[i] = fmt.Sprintf("Log line %d: Some error occurred", i)
 	}
-	
+
 	context := FailureContext{
 		Logs: &WorkflowLogs{
 			RawLogs:    strings.Join(logLines, "\n"),
 			ErrorLines: logLines[:10], // First 10 lines as errors
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = engine.preClassifyFailure(context)
@@ -538,7 +537,8 @@ func BenchmarkConcurrentModuleCreation(b *testing.B) {
 			module := New().
 				WithRepository(fmt.Sprintf("owner-%d", counter), "repo").
 				WithMinCoverage(85)
-			_ = module; counter++
+			_ = module
+			counter++
 		}
 	})
 }

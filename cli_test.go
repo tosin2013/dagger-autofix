@@ -57,20 +57,20 @@ func TestSetupLoggingUsesEnvVars(t *testing.T) {
 
 func TestNewCLI(t *testing.T) {
 	cli := NewCLI()
-	
+
 	assert.NotNil(t, cli)
 	assert.NotNil(t, cli.logger)
 	assert.NotNil(t, cli.rootCmd)
 	assert.Equal(t, "github-autofix", cli.rootCmd.Use)
 	assert.Equal(t, "1.0.0", cli.rootCmd.Version)
-	
+
 	// Check that all commands were added
 	commands := cli.rootCmd.Commands()
 	commandNames := make([]string, len(commands))
 	for i, cmd := range commands {
 		commandNames[i] = cmd.Name()
 	}
-	
+
 	expectedCommands := []string{"monitor", "analyze", "fix", "validate", "status", "config", "test"}
 	for _, expected := range expectedCommands {
 		assert.Contains(t, commandNames, expected)
@@ -138,7 +138,7 @@ func TestSetupLogging(t *testing.T) {
 			cli.setupLogging()
 
 			assert.Equal(t, tt.expectedLevel, cli.logger.GetLevel())
-			
+
 			if tt.expectedFormat == "text" {
 				_, ok := cli.logger.Formatter.(*logrus.TextFormatter)
 				assert.True(t, ok)
@@ -152,7 +152,7 @@ func TestSetupLogging(t *testing.T) {
 
 func TestGetCurrentConfig(t *testing.T) {
 	cli := NewCLI()
-	
+
 	// Set up environment variables
 	os.Setenv("GITHUB_TOKEN", "env-token")
 	os.Setenv("LLM_PROVIDER", "anthropic")
@@ -187,12 +187,12 @@ func TestGetStringValue(t *testing.T) {
 	cmd := cli.rootCmd
 
 	tests := []struct {
-		name      string
-		flagName  string
-		envName   string
-		envValue  string
-		expected  string
-		setFlag   bool
+		name     string
+		flagName string
+		envName  string
+		envValue string
+		expected string
+		setFlag  bool
 	}{
 		{
 			name:     "Env used when flag not set",
@@ -216,7 +216,7 @@ func TestGetStringValue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean environment first
 			os.Unsetenv(tt.envName)
-			
+
 			// Set up environment
 			if tt.envValue != "" {
 				os.Setenv(tt.envName, tt.envValue)
@@ -234,11 +234,11 @@ func TestGetIntValue(t *testing.T) {
 	cmd := cli.rootCmd
 
 	tests := []struct {
-		name      string
-		flagName  string
-		envName   string
-		envValue  string
-		expected  int
+		name     string
+		flagName string
+		envName  string
+		envValue string
+		expected int
 	}{
 		{
 			name:     "Valid env value",
@@ -281,11 +281,11 @@ func TestGetBoolValue(t *testing.T) {
 	cmd := cli.rootCmd
 
 	tests := []struct {
-		name      string
-		flagName  string
-		envName   string
-		envValue  string
-		expected  bool
+		name     string
+		flagName string
+		envName  string
+		envValue string
+		expected bool
 	}{
 		{
 			name:     "True string value",
@@ -332,7 +332,7 @@ func TestGetBoolValue(t *testing.T) {
 
 func TestCreateDefaultConfig(t *testing.T) {
 	cli := NewCLI()
-	
+
 	// Create temporary file
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, ".github-autofix.env")
@@ -348,7 +348,7 @@ func TestCreateDefaultConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	configStr := string(content)
-	
+
 	// Check that expected content is present
 	assert.Contains(t, configStr, "GITHUB_TOKEN=your_github_token_here")
 	assert.Contains(t, configStr, "LLM_PROVIDER=openai")
@@ -407,11 +407,11 @@ func TestMaskToken(t *testing.T) {
 
 func TestPrintConfig(t *testing.T) {
 	cli := NewCLI()
-	
+
 	config := &CLIConfig{
 		GitHubToken:  "test-token",
 		LLMProvider:  "openai",
-		LLMAPIKey:    "test-key", 
+		LLMAPIKey:    "test-key",
 		RepoOwner:    "test-owner",
 		RepoName:     "test-repo",
 		TargetBranch: "main",

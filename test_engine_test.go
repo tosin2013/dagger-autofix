@@ -27,7 +27,7 @@ func TestNewTestEngine(t *testing.T) {
 // Note: Skipping this test as it requires proper CoverageResult type setup
 func TestValidateTestCoverage(t *testing.T) {
 	t.Skip("Skipping ValidateTestCoverage test - requires proper CoverageResult setup")
-	
+
 	logger := logrus.New()
 	engine := NewTestEngine(85, logger)
 	_ = engine
@@ -363,7 +363,7 @@ func TestGenerateRegressionTests(t *testing.T) {
 	}
 
 	analysis := &FailureAnalysisResult{
-		ID: "test-analysis",
+		ID:            "test-analysis",
 		AffectedFiles: []string{"main.go", "util.go"},
 	}
 
@@ -427,7 +427,7 @@ func TestRunTestsUnitCoverage(t *testing.T) {
 	// Test with defensive error handling for complex integration
 	var result *TestResult
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -442,7 +442,7 @@ func TestRunTestsUnitCoverage(t *testing.T) {
 	// 1. A valid result if infrastructure is available
 	// 2. A controlled error if infrastructure is not available
 	// 3. A recovered panic if dependencies fail
-	
+
 	if err != nil {
 		// Expected in test environment without Dagger
 		assert.Contains(t, err.Error(), "panic in RunTests")
@@ -464,7 +464,7 @@ func TestDetectFrameworkUnitCoverage(t *testing.T) {
 	// Test the function with nil container (defensive)
 	var framework *TestFramework
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -485,11 +485,11 @@ func TestDetectFrameworkUnitCoverage(t *testing.T) {
 		assert.NotNil(t, framework)
 		assert.NotEmpty(t, framework.Name)
 	}
-	
+
 	// Test edge case: empty getFrameworkByFile calls (already covered but adding for completeness)
 	nilFramework := engine.getFrameworkByFile("")
 	assert.Nil(t, nilFramework)
-	
+
 	unknownFramework := engine.getFrameworkByFile("unknown.xyz")
 	assert.Nil(t, unknownFramework)
 }
@@ -513,7 +513,7 @@ func TestRunTestSuiteUnitCoverage(t *testing.T) {
 	// Test with nil container (defensive)
 	var output string
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -532,7 +532,7 @@ func TestRunTestSuiteUnitCoverage(t *testing.T) {
 		// If somehow it works, validate output
 		assert.NotNil(t, output)
 	}
-	
+
 	// Test framework validation edge cases
 	assert.NotEmpty(t, framework.TestCommand, "Framework should have test command")
 	assert.NotEmpty(t, framework.Environment, "Framework should have environment")
@@ -553,7 +553,7 @@ func TestRunLintingUnitCoverage(t *testing.T) {
 	// Test with nil container but no lint command (should handle gracefully)
 	var output string
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -567,7 +567,7 @@ func TestRunLintingUnitCoverage(t *testing.T) {
 	if err == nil {
 		assert.Equal(t, "No linting configured", output)
 	}
-	
+
 	// Test framework with lint command but nil container
 	frameworkWithLint := &TestFramework{
 		Name:        "with-lint",
@@ -576,7 +576,7 @@ func TestRunLintingUnitCoverage(t *testing.T) {
 			"GO111MODULE": "on",
 		},
 	}
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -607,7 +607,7 @@ func TestRunBuildUnitCoverage(t *testing.T) {
 	// Test with nil container but no build command (should handle gracefully)
 	var output string
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -638,7 +638,7 @@ func TestRunCoverageAnalysisUnitCoverage(t *testing.T) {
 	// Test with nil container but no coverage command (should handle gracefully)
 	var result *CoverageResult
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -663,7 +663,7 @@ func TestCreateTestContainerUnitCoverage(t *testing.T) {
 	// Test container creation (will fail without Dagger but tests the path)
 	var container interface{}
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {

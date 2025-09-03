@@ -102,7 +102,7 @@ func TestInitializeAndEnsureInitialized(t *testing.T) {
 		newLLMClient = func(ctx context.Context, provider LLMProvider, apiKey *dagger.Secret) (*LLMClient, error) {
 			return &LLMClient{}, nil
 		}
-		newFailureAnalysisEngine = func(llm *LLMClient, logger *logrus.Logger) *FailureAnalysisEngine {
+		newFailureAnalysisEngine = func(llmClient LLMClientInterface, logger *logrus.Logger) *FailureAnalysisEngine {
 			return &FailureAnalysisEngine{}
 		}
 		newTestEngine = func(minCoverage int, logger *logrus.Logger) *TestEngine {

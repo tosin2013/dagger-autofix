@@ -240,7 +240,7 @@ func (e *TestEngine) getFrameworkByFile(filename string) *TestFramework {
 	if filename == "" {
 		return nil
 	}
-	
+
 	switch filename {
 	case "package.json":
 		return e.testFrameworks["nodejs"]
@@ -380,7 +380,7 @@ func (e *TestEngine) parseTestOutput(output string, framework *TestFramework) Te
 			}
 			stats.Total++
 		}
-		
+
 		// Jest output parsing
 		if strings.Contains(line, "Tests:") {
 			// Example: "Tests:       5 passed, 2 failed, 7 total"
@@ -403,10 +403,10 @@ func (e *TestEngine) parseTestOutput(output string, framework *TestFramework) Te
 				}
 			}
 		}
-		
+
 		// Individual test result lines for Go
-		if (strings.Contains(line, "PASS") || strings.Contains(line, "FAIL")) && 
-		   (strings.Contains(line, "Test") || strings.Contains(line, "Example")) {
+		if (strings.Contains(line, "PASS") || strings.Contains(line, "FAIL")) &&
+			(strings.Contains(line, "Test") || strings.Contains(line, "Example")) {
 			// Only count if not already counted by summary lines
 			continue
 		}
@@ -436,7 +436,7 @@ func (e *TestEngine) parseCoverageOutput(output string, framework *TestFramework
 				}
 			}
 		}
-		
+
 		// Jest coverage output: "All files      |   85.25 |"
 		if strings.Contains(line, "All files") && strings.Contains(line, "|") {
 			parts := strings.Split(line, "|")
@@ -447,7 +447,7 @@ func (e *TestEngine) parseCoverageOutput(output string, framework *TestFramework
 				}
 			}
 		}
-		
+
 		// Python coverage output: "TOTAL          92%"
 		if strings.Contains(line, "TOTAL") && strings.Contains(line, "%") {
 			parts := strings.Fields(line)

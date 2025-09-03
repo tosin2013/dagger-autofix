@@ -53,12 +53,12 @@ func TestGenerateBranchName(t *testing.T) {
 // TestGeneratePRTitle tests the generatePRTitle method
 func TestGeneratePRTitle(t *testing.T) {
 	t.Skip("Skipping generatePRTitle test - requires proper engine setup")
-	
+
 	// This test would need a properly initialized engine
 	// For coverage purposes, we're testing other functions that work
 }
 
-// TestGeneratePRLabels tests the generatePRLabels method  
+// TestGeneratePRLabels tests the generatePRLabels method
 func TestGeneratePRLabels(t *testing.T) {
 	t.Skip("Skipping generatePRLabels test - needs proper setup")
 }
@@ -76,7 +76,7 @@ func TestBoolToEmoji(t *testing.T) {
 			expected: "✅",
 		},
 		{
-			name:     "False value", 
+			name:     "False value",
 			value:    false,
 			expected: "❌",
 		},
@@ -136,16 +136,16 @@ func TestPRGenerationLogic(t *testing.T) {
 func TestCreateFixPRUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel) // Reduce noise during testing
-	
+
 	// Create mock GitHub client
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	// Create test data
 	analysis := &FailureAnalysisResult{
 		ID: "test-analysis",
@@ -164,7 +164,7 @@ func TestCreateFixPRUnitCoverage(t *testing.T) {
 		},
 		LLMProvider: "test-provider",
 	}
-	
+
 	fix := &FixValidationResult{
 		Valid: true,
 		Fix: &ProposedFix{
@@ -174,10 +174,10 @@ func TestCreateFixPRUnitCoverage(t *testing.T) {
 			Confidence:  0.8,
 			Changes: []CodeChange{
 				{
-					FilePath:     "test.go",
-					Operation:    "modify",
-					NewContent:   "// Fixed content",
-					Explanation:  "Test fix",
+					FilePath:    "test.go",
+					Operation:   "modify",
+					NewContent:  "// Fixed content",
+					Explanation: "Test fix",
 				},
 			},
 		},
@@ -189,7 +189,7 @@ func TestCreateFixPRUnitCoverage(t *testing.T) {
 			SkippedTests: 1,
 		},
 	}
-	
+
 	// Test with defensive error handling
 	var err error
 	var pr *PullRequest
@@ -201,11 +201,11 @@ func TestCreateFixPRUnitCoverage(t *testing.T) {
 		}()
 		pr, err = engine.CreateFixPR(context.Background(), analysis, fix)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 	assert.Nil(t, pr)
-	
+
 	// Test with invalid fix
 	invalidFix := &FixValidationResult{Valid: false}
 	_, err = engine.CreateFixPR(context.Background(), analysis, invalidFix)
@@ -217,21 +217,21 @@ func TestCreateFixPRUnitCoverage(t *testing.T) {
 func TestUpdatePRUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	updates := &PRCreationOptions{
 		Title:  "Updated PR Title",
 		Body:   "Updated PR Body",
 		Labels: []string{"updated", "test"},
 	}
-	
+
 	// Test with defensive error handling
 	var err error
 	var pr *PullRequest
@@ -243,7 +243,7 @@ func TestUpdatePRUnitCoverage(t *testing.T) {
 		}()
 		pr, err = engine.UpdatePR(context.Background(), 123, updates)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 	assert.Nil(t, pr)
@@ -254,15 +254,15 @@ func TestUpdatePRUnitCoverage(t *testing.T) {
 func TestClosePRUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	// Test with defensive error handling
 	var err error
 	func() {
@@ -273,7 +273,7 @@ func TestClosePRUnitCoverage(t *testing.T) {
 		}()
 		err = engine.ClosePR(context.Background(), 123, "Test closure reason")
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 	// The specific error message may vary (panic vs API error)
@@ -283,15 +283,15 @@ func TestClosePRUnitCoverage(t *testing.T) {
 func TestGetPRStatusUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	// Test with defensive error handling
 	var err error
 	var pr *PullRequest
@@ -303,7 +303,7 @@ func TestGetPRStatusUnitCoverage(t *testing.T) {
 		}()
 		pr, err = engine.GetPRStatus(context.Background(), 123)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 	assert.Nil(t, pr)
@@ -314,15 +314,15 @@ func TestGetPRStatusUnitCoverage(t *testing.T) {
 func TestCreateBranchUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	changes := []CodeChange{
 		{
 			FilePath:    "test.go",
@@ -331,7 +331,7 @@ func TestCreateBranchUnitCoverage(t *testing.T) {
 			Explanation: "Test change",
 		},
 	}
-	
+
 	// Test with defensive error handling
 	var err error
 	func() {
@@ -342,7 +342,7 @@ func TestCreateBranchUnitCoverage(t *testing.T) {
 		}()
 		err = engine.createBranch(context.Background(), "test-branch", changes)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 	// The specific error message may vary (panic vs API error)
@@ -352,15 +352,15 @@ func TestCreateBranchUnitCoverage(t *testing.T) {
 func TestApplyChangeUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	// Test different operations
 	tests := []struct {
 		name      string
@@ -372,7 +372,7 @@ func TestApplyChangeUnitCoverage(t *testing.T) {
 		{"Delete operation", "delete", true},
 		{"Unknown operation", "unknown", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			change := CodeChange{
@@ -381,7 +381,7 @@ func TestApplyChangeUnitCoverage(t *testing.T) {
 				NewContent:  "// Test content",
 				Explanation: "Test change",
 			}
-			
+
 			var err error
 			func() {
 				defer func() {
@@ -391,11 +391,11 @@ func TestApplyChangeUnitCoverage(t *testing.T) {
 				}()
 				err = engine.applyChange(context.Background(), "test-branch", change)
 			}()
-			
+
 			if tt.expectErr {
 				assert.Error(t, err)
 			}
-			
+
 			// Unknown operation should return specific error
 			if tt.operation == "unknown" {
 				assert.Contains(t, err.Error(), "unknown operation")
@@ -408,20 +408,20 @@ func TestApplyChangeUnitCoverage(t *testing.T) {
 func TestCreateFileUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	change := CodeChange{
 		FilePath:   "new-file.go",
 		NewContent: "// New file content",
 	}
-	
+
 	// Test with defensive error handling
 	var err error
 	func() {
@@ -432,7 +432,7 @@ func TestCreateFileUnitCoverage(t *testing.T) {
 		}()
 		err = engine.createFile(context.Background(), "test-branch", change)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 }
@@ -441,21 +441,21 @@ func TestCreateFileUnitCoverage(t *testing.T) {
 func TestUpdateFileUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	change := CodeChange{
 		FilePath:    "existing-file.go",
 		NewContent:  "// Updated content",
 		Explanation: "Update file",
 	}
-	
+
 	// Test with defensive error handling
 	var err error
 	func() {
@@ -466,7 +466,7 @@ func TestUpdateFileUnitCoverage(t *testing.T) {
 		}()
 		err = engine.updateFile(context.Background(), "test-branch", change)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 	// The specific error message may vary (panic vs API error)
@@ -476,20 +476,20 @@ func TestUpdateFileUnitCoverage(t *testing.T) {
 func TestDeleteFileUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	change := CodeChange{
 		FilePath:    "delete-file.go",
 		Explanation: "Delete file",
 	}
-	
+
 	// Test with defensive error handling
 	var err error
 	func() {
@@ -500,7 +500,7 @@ func TestDeleteFileUnitCoverage(t *testing.T) {
 		}()
 		err = engine.deleteFile(context.Background(), "test-branch", change)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 	// The specific error message may vary (panic vs API error)
@@ -510,9 +510,9 @@ func TestDeleteFileUnitCoverage(t *testing.T) {
 func TestGeneratePRContentUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	engine := NewPullRequestEngine(nil, logger)
-	
+
 	analysis := &FailureAnalysisResult{
 		ID: "test-analysis",
 		Classification: FailureClassification{
@@ -525,7 +525,7 @@ func TestGeneratePRContentUnitCoverage(t *testing.T) {
 			},
 		},
 	}
-	
+
 	fix := &FixValidationResult{
 		Fix: &ProposedFix{
 			ID:        "test-fix",
@@ -533,7 +533,7 @@ func TestGeneratePRContentUnitCoverage(t *testing.T) {
 			Timestamp: time.Now(),
 		},
 	}
-	
+
 	// Test content generation with defensive error handling
 	var options *PRCreationOptions
 	var err error
@@ -545,7 +545,7 @@ func TestGeneratePRContentUnitCoverage(t *testing.T) {
 		}()
 		options = engine.generatePRContent(analysis, fix)
 	}()
-	
+
 	if err != nil {
 		// If there's a panic, that's acceptable for this integration test
 		assert.Error(t, err)
@@ -565,9 +565,9 @@ func TestGeneratePRContentUnitCoverage(t *testing.T) {
 func TestGeneratePRBodyUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	engine := NewPullRequestEngine(nil, logger)
-	
+
 	analysis := &FailureAnalysisResult{
 		ID:          "test-analysis",
 		RootCause:   "Test root cause",
@@ -585,7 +585,7 @@ func TestGeneratePRBodyUnitCoverage(t *testing.T) {
 		},
 		LLMProvider: "test-provider",
 	}
-	
+
 	fix := &FixValidationResult{
 		Fix: &ProposedFix{
 			ID:          "test-fix",
@@ -612,7 +612,7 @@ func TestGeneratePRBodyUnitCoverage(t *testing.T) {
 			SkippedTests: 1,
 		},
 	}
-	
+
 	// Test body generation (no external dependencies)
 	var body string
 	var err error
@@ -624,7 +624,7 @@ func TestGeneratePRBodyUnitCoverage(t *testing.T) {
 		}()
 		body = engine.generatePRBody(analysis, fix)
 	}()
-	
+
 	// Should succeed without error
 	assert.NoError(t, err)
 	assert.NotEmpty(t, body)
@@ -638,15 +638,15 @@ func TestGeneratePRBodyUnitCoverage(t *testing.T) {
 func TestCreatePullRequestUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	options := &PRCreationOptions{
 		BranchName:   "test-branch",
 		TargetBranch: "main",
@@ -657,7 +657,7 @@ func TestCreatePullRequestUnitCoverage(t *testing.T) {
 		Assignees:    []string{"assignee1"},
 		Draft:        false,
 	}
-	
+
 	// Test with defensive error handling
 	var err error
 	var pr *PullRequest
@@ -669,7 +669,7 @@ func TestCreatePullRequestUnitCoverage(t *testing.T) {
 		}()
 		pr, err = engine.createPullRequest(context.Background(), options)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 	assert.Nil(t, pr)
@@ -680,19 +680,19 @@ func TestCreatePullRequestUnitCoverage(t *testing.T) {
 func TestAddPRMetadataUnitCoverage(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.WarnLevel)
-	
+
 	githubClient := &GitHubIntegration{
 		repoOwner: "test-owner",
 		repoName:  "test-repo",
 		client:    nil, // This will cause expected failures in GitHub API calls
 	}
-	
+
 	engine := NewPullRequestEngine(githubClient, logger)
-	
+
 	pr := &PullRequest{
 		Number: 123,
 	}
-	
+
 	analysis := &FailureAnalysisResult{
 		ID:             "test-analysis",
 		ProcessingTime: time.Minute,
@@ -700,20 +700,20 @@ func TestAddPRMetadataUnitCoverage(t *testing.T) {
 			{Pattern: "pattern1", Description: "desc1"},
 			{Pattern: "pattern2", Description: "desc2"},
 		},
-		AffectedFiles:  []string{"file1.go", "file2.go"},
+		AffectedFiles: []string{"file1.go", "file2.go"},
 		Classification: FailureClassification{
 			Tags: []string{"tag1", "tag2"},
 		},
 		LLMProvider: "test-provider",
 	}
-	
+
 	fix := &FixValidationResult{
 		TestResult: &TestResult{
 			Duration: time.Second * 30,
 			Output:   "Test output with details",
 		},
 	}
-	
+
 	// Test with defensive error handling
 	var err error
 	func() {
@@ -724,7 +724,7 @@ func TestAddPRMetadataUnitCoverage(t *testing.T) {
 		}()
 		err = engine.addPRMetadata(context.Background(), pr, analysis, fix)
 	}()
-	
+
 	// Validate that error handling works (GitHub API will fail in test)
 	assert.Error(t, err)
 }
@@ -768,7 +768,7 @@ func TestTruncateStringUnitCoverage(t *testing.T) {
 			expected: "...",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := truncateString(tt.input, tt.maxLen)
