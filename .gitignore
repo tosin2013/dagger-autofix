@@ -1,0 +1,29 @@
+# Coverage files
+*.out
+coverage*.out
+llm_coverage.out
+
+# Binary files
+dagger-autofix
+github-autofix
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Test artifacts
+test-results/
+test-output/

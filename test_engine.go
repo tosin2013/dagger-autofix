@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -236,6 +237,10 @@ func (e *TestEngine) detectFramework(ctx context.Context, container *dagger.Cont
 }
 
 func (e *TestEngine) getFrameworkByFile(filename string) *TestFramework {
+	if filename == "" {
+		return nil
+	}
+	
 	switch filename {
 	case "package.json":
 		return e.testFrameworks["nodejs"]
@@ -249,8 +254,15 @@ func (e *TestEngine) getFrameworkByFile(filename string) *TestFramework {
 		return e.testFrameworks["rust"]
 	case "composer.json":
 		return e.testFrameworks["php"]
-	default:
+	case "Makefile", "makefile":
 		return e.testFrameworks["generic"]
+	default:
+		// For truly unknown files, check if it's a generic build file pattern
+		if strings.HasSuffix(filename, ".file") || strings.Contains(filename, "Makefile") {
+			return e.testFrameworks["generic"]
+		}
+		// Return nil for unknown file extensions
+		return nil
 	}
 }
 
@@ -354,34 +366,98 @@ type TestStats struct {
 }
 
 func (e *TestEngine) parseTestOutput(output string, framework *TestFramework) TestStats {
-	// Simplified test parsing - in reality, this would be framework-specific
+	// Framework-specific test parsing
 	stats := TestStats{}
 
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
-		if strings.Contains(line, "test") {
-			stats.Total++
-			if strings.Contains(line, "PASS") || strings.Contains(line, "✓") {
+		// Go test output parsing
+		if strings.Contains(line, "PASS:") || strings.Contains(line, "FAIL:") {
+			if strings.Contains(line, "PASS:") {
 				stats.Passed++
-			} else if strings.Contains(line, "FAIL") || strings.Contains(line, "✗") {
+			} else if strings.Contains(line, "FAIL:") {
 				stats.Failed++
-			} else if strings.Contains(line, "SKIP") {
-				stats.Skipped++
+			}
+			stats.Total++
+		}
+		
+		// Jest output parsing
+		if strings.Contains(line, "Tests:") {
+			// Example: "Tests:       5 passed, 2 failed, 7 total"
+			parts := strings.Fields(line)
+			for i, part := range parts {
+				if part == "passed," && i > 0 {
+					if val, err := strconv.Atoi(parts[i-1]); err == nil {
+						stats.Passed = val
+					}
+				}
+				if part == "failed," && i > 0 {
+					if val, err := strconv.Atoi(parts[i-1]); err == nil {
+						stats.Failed = val
+					}
+				}
+				if part == "total" && i > 0 {
+					if val, err := strconv.Atoi(parts[i-1]); err == nil {
+						stats.Total = val
+					}
+				}
 			}
 		}
+		
+		// Individual test result lines for Go
+		if (strings.Contains(line, "PASS") || strings.Contains(line, "FAIL")) && 
+		   (strings.Contains(line, "Test") || strings.Contains(line, "Example")) {
+			// Only count if not already counted by summary lines
+			continue
+		}
+	}
+
+	// If no summary found, calculate total
+	if stats.Total == 0 && (stats.Passed > 0 || stats.Failed > 0) {
+		stats.Total = stats.Passed + stats.Failed + stats.Skipped
 	}
 
 	return stats
 }
 
 func (e *TestEngine) parseCoverageOutput(output string, framework *TestFramework) float64 {
-	// Simplified coverage parsing - in reality, this would be framework-specific
+	// Framework-specific coverage parsing
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
-		if strings.Contains(line, "%") {
-			// Extract percentage (simplified)
-			if strings.Contains(line, "coverage") {
-				return 85.0 // Placeholder
+		// Go coverage output: "coverage: 75.5% of statements"
+		if strings.Contains(line, "coverage:") && strings.Contains(line, "% of statements") {
+			parts := strings.Fields(line)
+			for _, part := range parts {
+				if strings.HasSuffix(part, "%") {
+					percentStr := strings.TrimSuffix(part, "%")
+					if val, err := strconv.ParseFloat(percentStr, 64); err == nil {
+						return val
+					}
+				}
+			}
+		}
+		
+		// Jest coverage output: "All files      |   85.25 |"
+		if strings.Contains(line, "All files") && strings.Contains(line, "|") {
+			parts := strings.Split(line, "|")
+			if len(parts) >= 2 {
+				percentStr := strings.TrimSpace(parts[1])
+				if val, err := strconv.ParseFloat(percentStr, 64); err == nil {
+					return val
+				}
+			}
+		}
+		
+		// Python coverage output: "TOTAL          92%"
+		if strings.Contains(line, "TOTAL") && strings.Contains(line, "%") {
+			parts := strings.Fields(line)
+			for _, part := range parts {
+				if strings.HasSuffix(part, "%") {
+					percentStr := strings.TrimSuffix(part, "%")
+					if val, err := strconv.ParseFloat(percentStr, 64); err == nil {
+						return val
+					}
+				}
 			}
 		}
 	}
