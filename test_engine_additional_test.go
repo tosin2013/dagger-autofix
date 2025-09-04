@@ -25,7 +25,7 @@ func TestRunTestsComprehensive(t *testing.T) {
 					err = assert.AnError // Set error to indicate panic occurred
 				}
 			}()
-			result, err = engine.RunTests(nil, "test-owner", "test-repo", "main")
+			result, err = engine.RunTests(context.TODO(), "test-owner", "test-repo", "main")
 		}()
 		
 		// Will likely get an error due to nil context, which is expected

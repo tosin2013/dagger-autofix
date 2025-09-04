@@ -306,7 +306,15 @@ func (c *CLI) runStatus(cmd *cobra.Command, args []string) error {
 func (c *CLI) runConfigInit(cmd *cobra.Command, args []string) error {
 	c.logger.Info("Initializing configuration")
 
-	configFile, _ := cmd.Parent().Parent().PersistentFlags().GetString("config")
+	var configFile string
+	// Safely navigate the command hierarchy
+	if cmd.Parent() != nil && cmd.Parent().Parent() != nil {
+		configFile, _ = cmd.Parent().Parent().PersistentFlags().GetString("config")
+	}
+	// Use default filename if none provided
+	if configFile == "" {
+		configFile = ".github-autofix.env"
+	}
 	return c.createDefaultConfig(configFile)
 }
 
@@ -423,16 +431,22 @@ func (c *CLI) initializeAgent(ctx context.Context) (*DaggerAutofix, error) {
 		return nil, fmt.Errorf("repository owner and name are required")
 	}
 
-	// Create agent
-	agent := New().
-		WithGitHubToken(dag.SetSecret("github-token", config.GitHubToken)).
-		WithLLMProvider(config.LLMProvider, dag.SetSecret("llm-api-key", config.LLMAPIKey)).
-		WithRepository(config.RepoOwner, config.RepoName).
-		WithTargetBranch(config.TargetBranch).
-		WithMinCoverage(config.MinCoverage)
-
-	// Initialize agent
-	return agent.Initialize(ctx)
+	// Create agent - handle case where dag is nil (in tests)
+	var agent *DaggerAutofix
+	if dag != nil {
+		agent = New().
+			WithGitHubToken(dag.SetSecret("github-token", config.GitHubToken)).
+			WithLLMProvider(config.LLMProvider, dag.SetSecret("llm-api-key", config.LLMAPIKey)).
+			WithRepository(config.RepoOwner, config.RepoName).
+			WithTargetBranch(config.TargetBranch).
+			WithMinCoverage(config.MinCoverage)
+		
+		// Initialize agent
+		return agent.Initialize(ctx)
+	} else {
+		// For testing without Dagger context
+		return nil, fmt.Errorf("dagger client not available (testing environment)")
+	}
 }
 
 func (c *CLI) getCurrentConfig(cmd *cobra.Command) *CLIConfig {

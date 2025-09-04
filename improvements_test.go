@@ -382,7 +382,7 @@ func TestCircuitBreaker(t *testing.T) {
 		}
 
 		// Trigger circuit breaker
-		cb.Execute(failingOperation)
+		_ = cb.Execute(failingOperation)
 		
 		// Should be rejected
 		err := cb.Execute(failingOperation)
@@ -411,7 +411,8 @@ func TestGracefulShutdown(t *testing.T) {
 			return nil
 		})
 		
-		gs.Shutdown()
+		err := gs.Shutdown()
+		assert.NoError(t, err)
 		assert.True(t, shutdownCalled)
 	})
 
@@ -425,7 +426,8 @@ func TestGracefulShutdown(t *testing.T) {
 			})
 		}
 		
-		gs.Shutdown()
+		err := gs.Shutdown()
+		assert.NoError(t, err)
 		assert.Equal(t, 3, shutdownCount)
 	})
 }

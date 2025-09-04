@@ -42,7 +42,7 @@ func TestSafeCLIFunctions(t *testing.T) {
 	t.Run("runConfigShow", func(t *testing.T) {
 		cmd := &cobra.Command{}
 		// This function doesn't return an error, just prints
-		cli.runConfigShow(cmd, []string{})
+		_ = cli.runConfigShow(cmd, []string{})
 		// Test passes if no panic occurs
 	})
 
@@ -159,13 +159,17 @@ func TestConfigInit(t *testing.T) {
 	// Create temporary directory for config test
 	tmpDir := t.TempDir()
 	originalCwd, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(originalCwd)
+	err := os.Chdir(tmpDir)
+	assert.NoError(t, err)
+	defer func() {
+		err := os.Chdir(originalCwd)
+		assert.NoError(t, err)
+	}()
 
 	cli := NewCLI()
 	cmd := &cobra.Command{}
 	
-	err := cli.runConfigInit(cmd, []string{})
+	err = cli.runConfigInit(cmd, []string{})
 	assert.NoError(t, err)
 	
 	// Verify config file was created
