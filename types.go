@@ -268,6 +268,28 @@ type OperationalMetrics struct {
 	LastUpdated           time.Time               `json:"last_updated"`
 }
 
+// PRCreationOptions contains options for creating a pull request
+type PRCreationOptions struct {
+	BranchName   string   `json:"branch_name"`
+	TargetBranch string   `json:"target_branch"`
+	Title        string   `json:"title"`
+	Body         string   `json:"body"`
+	Labels       []string `json:"labels"`
+	Reviewers    []string `json:"reviewers"`
+	Assignees    []string `json:"assignees"`
+	Draft        bool     `json:"draft"`
+	AutoMerge    bool     `json:"auto_merge"`
+	DeleteBranch bool     `json:"delete_branch"`
+}
+
+// PRUpdateOptions contains options for updating a pull request
+type PRUpdateOptions struct {
+	Title  *string  `json:"title,omitempty"`
+	Body   *string  `json:"body,omitempty"`
+	Labels []string `json:"labels,omitempty"`
+	State  *string  `json:"state,omitempty"` // "open" or "closed"
+}
+
 // GitHubIntegration handles GitHub API interactions
 type GitHubIntegration struct {
 	client    *github.Client
@@ -454,4 +476,145 @@ func (g *GitHubIntegration) applyFileChange(ctx context.Context, branch string, 
 	// For now, we'll just log the change
 	g.logger.Infof("Would apply change to %s in branch %s: %s", change.FilePath, branch, change.Operation)
 	return nil
+}
+
+// CreatePullRequest creates a new pull request
+func (g *GitHubIntegration) CreatePullRequest(ctx context.Context, options *PRCreationOptions) (*PullRequest, error) {
+	newPR := &github.NewPullRequest{
+		Title: github.String(options.Title),
+		Body:  github.String(options.Body),
+		Head:  github.String(options.BranchName),
+		Base:  github.String(options.TargetBranch),
+		Draft: github.Bool(options.Draft),
+	}
+
+	pr, _, err := g.client.PullRequests.Create(ctx, g.repoOwner, g.repoName, newPR)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pull request: %w", err)
+	}
+
+	// Add labels if specified
+	if len(options.Labels) > 0 {
+		_, _, err := g.client.Issues.AddLabelsToIssue(ctx, g.repoOwner, g.repoName, pr.GetNumber(), options.Labels)
+		if err != nil {
+			g.logger.WithError(err).Warn("Failed to add labels to pull request")
+		}
+	}
+
+	// Add reviewers if specified
+	if len(options.Reviewers) > 0 {
+		reviewersRequest := github.ReviewersRequest{
+			Reviewers: options.Reviewers,
+		}
+		_, _, err := g.client.PullRequests.RequestReviewers(ctx, g.repoOwner, g.repoName, pr.GetNumber(), reviewersRequest)
+		if err != nil {
+			g.logger.WithError(err).Warn("Failed to add reviewers to pull request")
+		}
+	}
+
+	// Add assignees if specified
+	if len(options.Assignees) > 0 {
+		_, _, err := g.client.Issues.AddAssignees(ctx, g.repoOwner, g.repoName, pr.GetNumber(), options.Assignees)
+		if err != nil {
+			g.logger.WithError(err).Warn("Failed to add assignees to pull request")
+		}
+	}
+
+	return convertGitHubPRToPR(pr), nil
+}
+
+// UpdatePullRequest updates an existing pull request
+func (g *GitHubIntegration) UpdatePullRequest(ctx context.Context, prNumber int, updates *PRUpdateOptions) (*PullRequest, error) {
+	updatedPR := &github.PullRequest{}
+
+	if updates.Title != nil {
+		updatedPR.Title = github.String(*updates.Title)
+	}
+	if updates.Body != nil {
+		updatedPR.Body = github.String(*updates.Body)
+	}
+	if updates.State != nil {
+		updatedPR.State = github.String(*updates.State)
+	}
+
+	result, _, err := g.client.PullRequests.Edit(ctx, g.repoOwner, g.repoName, prNumber, updatedPR)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update pull request: %w", err)
+	}
+
+	// Update labels if specified
+	if len(updates.Labels) > 0 {
+		_, _, err := g.client.Issues.ReplaceLabelsForIssue(ctx, g.repoOwner, g.repoName, prNumber, updates.Labels)
+		if err != nil {
+			g.logger.WithError(err).Warn("Failed to update labels on pull request")
+		}
+	}
+
+	return convertGitHubPRToPR(result), nil
+}
+
+// GetPullRequest retrieves a pull request by number
+func (g *GitHubIntegration) GetPullRequest(ctx context.Context, prNumber int) (*PullRequest, error) {
+	pr, _, err := g.client.PullRequests.Get(ctx, g.repoOwner, g.repoName, prNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pull request: %w", err)
+	}
+	return convertGitHubPRToPR(pr), nil
+}
+
+// ClosePullRequest closes a pull request
+func (g *GitHubIntegration) ClosePullRequest(ctx context.Context, prNumber int) error {
+	updatedPR := &github.PullRequest{
+		State: github.String("closed"),
+	}
+	_, _, err := g.client.PullRequests.Edit(ctx, g.repoOwner, g.repoName, prNumber, updatedPR)
+	if err != nil {
+		return fmt.Errorf("failed to close pull request: %w", err)
+	}
+	return nil
+}
+
+// AddPullRequestComment adds a comment to a pull request
+func (g *GitHubIntegration) AddPullRequestComment(ctx context.Context, prNumber int, comment string) error {
+	issueComment := &github.IssueComment{
+		Body: github.String(comment),
+	}
+	_, _, err := g.client.Issues.CreateComment(ctx, g.repoOwner, g.repoName, prNumber, issueComment)
+	if err != nil {
+		return fmt.Errorf("failed to add comment to pull request: %w", err)
+	}
+	return nil
+}
+
+// GetRepoOwner returns the repository owner
+func (g *GitHubIntegration) GetRepoOwner() string {
+	return g.repoOwner
+}
+
+// GetRepoName returns the repository name
+func (g *GitHubIntegration) GetRepoName() string {
+	return g.repoName
+}
+
+// convertGitHubPRToPR converts a GitHub PR to our internal PR struct
+func convertGitHubPRToPR(ghPR *github.PullRequest) *PullRequest {
+	labels := make([]string, len(ghPR.Labels))
+	for i, label := range ghPR.Labels {
+		labels[i] = label.GetName()
+	}
+
+	author := ""
+	if ghPR.User != nil {
+		author = ghPR.User.GetLogin()
+	}
+
+	return &PullRequest{
+		Number:    ghPR.GetNumber(),
+		Title:     ghPR.GetTitle(),
+		URL:       ghPR.GetHTMLURL(),
+		State:     ghPR.GetState(),
+		CreatedAt: ghPR.GetCreatedAt(),
+		Author:    author,
+		Labels:    labels,
+	}
 }

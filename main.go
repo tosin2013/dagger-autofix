@@ -14,10 +14,22 @@ import (
 
 // Interfaces for dependency injection
 type GitHubClient interface {
+	// Workflow operations
 	GetWorkflowRun(ctx context.Context, runID int64) (*WorkflowRun, error)
 	GetWorkflowLogs(ctx context.Context, runID int64) (*WorkflowLogs, error)
 	GetFailedWorkflowRuns(ctx context.Context) ([]*WorkflowRun, error)
 	CreateTestBranch(ctx context.Context, branchName string, changes []CodeChange) (func(), error)
+	
+	// Pull request operations
+	CreatePullRequest(ctx context.Context, options *PRCreationOptions) (*PullRequest, error)
+	UpdatePullRequest(ctx context.Context, prNumber int, updates *PRUpdateOptions) (*PullRequest, error)
+	GetPullRequest(ctx context.Context, prNumber int) (*PullRequest, error)
+	ClosePullRequest(ctx context.Context, prNumber int) error
+	AddPullRequestComment(ctx context.Context, prNumber int, comment string) error
+	
+	// Repository information
+	GetRepoOwner() string
+	GetRepoName() string
 }
 
 type FailureEngine interface {
@@ -187,15 +199,8 @@ func (m *DaggerAutofix) Initialize(ctx context.Context) (*DaggerAutofix, error) 
 	// Initialize test engine
 	m.testEngine = newTestEngine(m.MinCoverage, m.logger)
 
-	// Initialize PR engine (currently requires direct GitHub client)
-	// TODO: Refactor PR engine to use GitHubClient interface
-	if directClient, ok := ghClient.(*GitHubIntegration); ok {
-		m.prEngine = newPullRequestEngine(directClient, m.logger)
-	} else {
-		// For MCP clients, we'll need to implement PR engine functionality via MCP
-		// For now, disable PR engine when using MCP
-		m.logger.Warn("PR engine not available with MCP client yet")
-	}
+	// Initialize PR engine (now supports both MCP and direct GitHub clients)
+	m.prEngine = newPullRequestEngine(ghClient, m.logger)
 
 	m.logger.Info("DaggerAutofix initialized successfully")
 	return m, nil

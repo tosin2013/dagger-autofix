@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/v45/github"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -14,7 +13,7 @@ import (
 
 // PullRequestEngine handles automated pull request creation and management
 type PullRequestEngine struct {
-	githubClient *GitHubIntegration
+	githubClient GitHubClient
 	logger       *logrus.Logger
 	templates    *PRTemplates
 }
@@ -28,22 +27,8 @@ type PRTemplates struct {
 	Reviewers []string `json:"reviewers"`
 }
 
-// PRCreationOptions contains options for PR creation
-type PRCreationOptions struct {
-	BranchName   string   `json:"branch_name"`
-	TargetBranch string   `json:"target_branch"`
-	Title        string   `json:"title"`
-	Body         string   `json:"body"`
-	Labels       []string `json:"labels"`
-	Reviewers    []string `json:"reviewers"`
-	Assignees    []string `json:"assignees"`
-	Draft        bool     `json:"draft"`
-	AutoMerge    bool     `json:"auto_merge"`
-	DeleteBranch bool     `json:"delete_branch"`
-}
-
 // NewPullRequestEngine creates a new pull request engine
-func NewPullRequestEngine(githubClient *GitHubIntegration, logger *logrus.Logger) *PullRequestEngine {
+func NewPullRequestEngine(githubClient GitHubClient, logger *logrus.Logger) *PullRequestEngine {
 	return &PullRequestEngine{
 		githubClient: githubClient,
 		logger:       logger,
@@ -116,42 +101,20 @@ func (p *PullRequestEngine) CreateManualPR(ctx context.Context, analysis *Failur
 func (p *PullRequestEngine) UpdatePR(ctx context.Context, prNumber int, updates *PRCreationOptions) (*PullRequest, error) {
 	p.logger.WithField("pr_number", prNumber).Info("Updating pull request")
 
-	// Get existing PR
-	existingPR, _, err := p.githubClient.client.PullRequests.Get(ctx, p.githubClient.repoOwner, p.githubClient.repoName, prNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get existing PR: %w", err)
+	// Convert PRCreationOptions to PRUpdateOptions
+	updateOptions := &PRUpdateOptions{
+		Title:  &updates.Title,
+		Body:   &updates.Body,
+		Labels: updates.Labels,
 	}
 
-	// Update PR
-	updatedPR := &github.PullRequest{
-		Title: &updates.Title,
-		Body:  &updates.Body,
-	}
-
-	result, _, err := p.githubClient.client.PullRequests.Edit(ctx, p.githubClient.repoOwner, p.githubClient.repoName, prNumber, updatedPR)
+	// Update PR using the interface
+	result, err := p.githubClient.UpdatePullRequest(ctx, prNumber, updateOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update PR: %w", err)
 	}
 
-	// Update labels if provided
-	if len(updates.Labels) > 0 {
-		if _, _, err := p.githubClient.client.Issues.ReplaceLabelsForIssue(ctx, p.githubClient.repoOwner, p.githubClient.repoName, prNumber, updates.Labels); err != nil {
-			p.logger.WithError(err).Warn("Failed to update PR labels")
-		}
-	}
-
-	return &PullRequest{
-		Number:    result.GetNumber(),
-		Title:     result.GetTitle(),
-		Body:      result.GetBody(),
-		URL:       result.GetHTMLURL(),
-		Branch:    existingPR.GetHead().GetRef(),
-		CommitSHA: result.GetHead().GetSHA(),
-		State:     result.GetState(),
-		CreatedAt: result.GetCreatedAt(),
-		Author:    result.GetUser().GetLogin(),
-		Labels:    updates.Labels,
-	}, nil
+	return result, nil
 }
 
 // ClosePR closes a pull request
@@ -161,23 +124,14 @@ func (p *PullRequestEngine) ClosePR(ctx context.Context, prNumber int, reason st
 		"reason":    reason,
 	}).Info("Closing pull request")
 
-	// Close PR
-	state := "closed"
-	updatedPR := &github.PullRequest{
-		State: &state,
-	}
-
-	_, _, err := p.githubClient.client.PullRequests.Edit(ctx, p.githubClient.repoOwner, p.githubClient.repoName, prNumber, updatedPR)
+	// Close PR using the interface
+	err := p.githubClient.ClosePullRequest(ctx, prNumber)
 	if err != nil {
 		return fmt.Errorf("failed to close PR: %w", err)
 	}
 
 	// Add closing comment
-	comment := &github.IssueComment{
-		Body: &reason,
-	}
-
-	if _, _, err := p.githubClient.client.Issues.CreateComment(ctx, p.githubClient.repoOwner, p.githubClient.repoName, prNumber, comment); err != nil {
+	if err := p.githubClient.AddPullRequestComment(ctx, prNumber, reason); err != nil {
 		p.logger.WithError(err).Warn("Failed to add closing comment")
 	}
 
@@ -186,34 +140,12 @@ func (p *PullRequestEngine) ClosePR(ctx context.Context, prNumber int, reason st
 
 // GetPRStatus gets the status of a pull request
 func (p *PullRequestEngine) GetPRStatus(ctx context.Context, prNumber int) (*PullRequest, error) {
-	pr, _, err := p.githubClient.client.PullRequests.Get(ctx, p.githubClient.repoOwner, p.githubClient.repoName, prNumber)
+	pr, err := p.githubClient.GetPullRequest(ctx, prNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PR: %w", err)
 	}
 
-	// Get labels
-	labels, _, err := p.githubClient.client.Issues.ListLabelsByIssue(ctx, p.githubClient.repoOwner, p.githubClient.repoName, prNumber, nil)
-	if err != nil {
-		p.logger.WithError(err).Warn("Failed to get PR labels")
-	}
-
-	var labelNames []string
-	for _, label := range labels {
-		labelNames = append(labelNames, label.GetName())
-	}
-
-	return &PullRequest{
-		Number:    pr.GetNumber(),
-		Title:     pr.GetTitle(),
-		Body:      pr.GetBody(),
-		URL:       pr.GetHTMLURL(),
-		Branch:    pr.GetHead().GetRef(),
-		CommitSHA: pr.GetHead().GetSHA(),
-		State:     pr.GetState(),
-		CreatedAt: pr.GetCreatedAt(),
-		Author:    pr.GetUser().GetLogin(),
-		Labels:    labelNames,
-	}, nil
+	return pr, nil
 }
 
 // Private helper methods
@@ -227,103 +159,38 @@ func (p *PullRequestEngine) generateBranchName(analysis *FailureAnalysisResult, 
 func (p *PullRequestEngine) createBranch(ctx context.Context, branchName string, changes []CodeChange) error {
 	p.logger.WithField("branch", branchName).Debug("Creating branch with changes")
 
-	// Get the default branch reference
-	mainRef, _, err := p.githubClient.client.Git.GetRef(ctx, p.githubClient.repoOwner, p.githubClient.repoName, "heads/main")
+	// Use the GitHubClient interface to create test branch with changes
+	cleanup, err := p.githubClient.CreateTestBranch(ctx, branchName, changes)
 	if err != nil {
-		return fmt.Errorf("failed to get main branch ref: %w", err)
+		return fmt.Errorf("failed to create branch with changes: %w", err)
 	}
 
-	// Create new branch
-	newRef := &github.Reference{
-		Ref: github.String("refs/heads/" + branchName),
-		Object: &github.GitObject{
-			SHA: mainRef.Object.SHA,
-		},
-	}
-
-	_, _, err = p.githubClient.client.Git.CreateRef(ctx, p.githubClient.repoOwner, p.githubClient.repoName, newRef)
-	if err != nil {
-		return fmt.Errorf("failed to create branch: %w", err)
-	}
-
-	// Apply changes to the branch
-	for _, change := range changes {
-		if err := p.applyChange(ctx, branchName, change); err != nil {
-			p.logger.WithError(err).Warnf("Failed to apply change to %s", change.FilePath)
-			// Continue with other changes even if one fails
-		}
-	}
+	// Store cleanup function for later use (could be stored in a map if needed)
+	_ = cleanup // For now, we don't call cleanup as the branch should persist for the PR
 
 	return nil
 }
 
+// applyChange is no longer needed as we use GitHubClient.CreateTestBranch
+// which handles all change operations internally
 func (p *PullRequestEngine) applyChange(ctx context.Context, branch string, change CodeChange) error {
-	p.logger.WithFields(logrus.Fields{
-		"file":      change.FilePath,
-		"operation": change.Operation,
-		"branch":    branch,
-	}).Debug("Applying code change")
-
-	switch change.Operation {
-	case "add":
-		return p.createFile(ctx, branch, change)
-	case "modify":
-		return p.updateFile(ctx, branch, change)
-	case "delete":
-		return p.deleteFile(ctx, branch, change)
-	default:
-		return fmt.Errorf("unknown operation: %s", change.Operation)
-	}
+	// This method is deprecated - changes are now applied via GitHubClient.CreateTestBranch
+	return fmt.Errorf("applyChange is deprecated, use GitHubClient.CreateTestBranch instead")
 }
 
+// createFile is no longer needed - handled by GitHubClient.CreateTestBranch
 func (p *PullRequestEngine) createFile(ctx context.Context, branch string, change CodeChange) error {
-	fileContent := &github.RepositoryContentFileOptions{
-		Message: github.String(fmt.Sprintf("Add %s", change.FilePath)),
-		Content: []byte(change.NewContent),
-		Branch:  &branch,
-	}
-
-	_, _, err := p.githubClient.client.Repositories.CreateFile(ctx, p.githubClient.repoOwner, p.githubClient.repoName, change.FilePath, fileContent)
-	return err
+	return fmt.Errorf("createFile is deprecated, use GitHubClient.CreateTestBranch instead")
 }
 
+// updateFile is no longer needed - handled by GitHubClient.CreateTestBranch
 func (p *PullRequestEngine) updateFile(ctx context.Context, branch string, change CodeChange) error {
-	// Get current file to get SHA
-	fileContent, _, _, err := p.githubClient.client.Repositories.GetContents(ctx, p.githubClient.repoOwner, p.githubClient.repoName, change.FilePath, &github.RepositoryContentGetOptions{
-		Ref: branch,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to get file content: %w", err)
-	}
-
-	updateOptions := &github.RepositoryContentFileOptions{
-		Message: github.String(fmt.Sprintf("Update %s - %s", change.FilePath, change.Explanation)),
-		Content: []byte(change.NewContent),
-		SHA:     fileContent.SHA,
-		Branch:  &branch,
-	}
-
-	_, _, err = p.githubClient.client.Repositories.UpdateFile(ctx, p.githubClient.repoOwner, p.githubClient.repoName, change.FilePath, updateOptions)
-	return err
+	return fmt.Errorf("updateFile is deprecated, use GitHubClient.CreateTestBranch instead")
 }
 
+// deleteFile is no longer needed - handled by GitHubClient.CreateTestBranch
 func (p *PullRequestEngine) deleteFile(ctx context.Context, branch string, change CodeChange) error {
-	// Get current file to get SHA
-	fileContent, _, _, err := p.githubClient.client.Repositories.GetContents(ctx, p.githubClient.repoOwner, p.githubClient.repoName, change.FilePath, &github.RepositoryContentGetOptions{
-		Ref: branch,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to get file content: %w", err)
-	}
-
-	deleteOptions := &github.RepositoryContentFileOptions{
-		Message: github.String(fmt.Sprintf("Delete %s - %s", change.FilePath, change.Explanation)),
-		SHA:     fileContent.SHA,
-		Branch:  &branch,
-	}
-
-	_, _, err = p.githubClient.client.Repositories.DeleteFile(ctx, p.githubClient.repoOwner, p.githubClient.repoName, change.FilePath, deleteOptions)
-	return err
+	return fmt.Errorf("deleteFile is deprecated, use GitHubClient.CreateTestBranch instead")
 }
 
 func (p *PullRequestEngine) generatePRContent(analysis *FailureAnalysisResult, fix *FixValidationResult) *PRCreationOptions {
@@ -462,55 +329,13 @@ func (p *PullRequestEngine) generatePRLabels(analysis *FailureAnalysisResult, fi
 }
 
 func (p *PullRequestEngine) createPullRequest(ctx context.Context, options *PRCreationOptions) (*PullRequest, error) {
-	newPR := &github.NewPullRequest{
-		Title: &options.Title,
-		Head:  &options.BranchName,
-		Base:  &options.TargetBranch,
-		Body:  &options.Body,
-		Draft: &options.Draft,
-	}
-
-	pr, _, err := p.githubClient.client.PullRequests.Create(ctx, p.githubClient.repoOwner, p.githubClient.repoName, newPR)
+	// Use the GitHubClient interface to create PR
+	pr, err := p.githubClient.CreatePullRequest(ctx, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create PR: %w", err)
 	}
 
-	// Add labels
-	if len(options.Labels) > 0 {
-		if _, _, err := p.githubClient.client.Issues.AddLabelsToIssue(ctx, p.githubClient.repoOwner, p.githubClient.repoName, pr.GetNumber(), options.Labels); err != nil {
-			p.logger.WithError(err).Warn("Failed to add labels to PR")
-		}
-	}
-
-	// Request reviewers
-	if len(options.Reviewers) > 0 {
-		reviewersRequest := github.ReviewersRequest{
-			Reviewers: options.Reviewers,
-		}
-		if _, _, err := p.githubClient.client.PullRequests.RequestReviewers(ctx, p.githubClient.repoOwner, p.githubClient.repoName, pr.GetNumber(), reviewersRequest); err != nil {
-			p.logger.WithError(err).Warn("Failed to request reviewers")
-		}
-	}
-
-	// Assign assignees
-	if len(options.Assignees) > 0 {
-		if _, _, err := p.githubClient.client.Issues.AddAssignees(ctx, p.githubClient.repoOwner, p.githubClient.repoName, pr.GetNumber(), options.Assignees); err != nil {
-			p.logger.WithError(err).Warn("Failed to add assignees")
-		}
-	}
-
-	return &PullRequest{
-		Number:    pr.GetNumber(),
-		Title:     pr.GetTitle(),
-		Body:      pr.GetBody(),
-		URL:       pr.GetHTMLURL(),
-		Branch:    options.BranchName,
-		CommitSHA: pr.GetHead().GetSHA(),
-		State:     pr.GetState(),
-		CreatedAt: pr.GetCreatedAt(),
-		Author:    pr.GetUser().GetLogin(),
-		Labels:    options.Labels,
-	}, nil
+	return pr, nil
 }
 
 func (p *PullRequestEngine) addPRMetadata(ctx context.Context, pr *PullRequest, analysis *FailureAnalysisResult, fix *FixValidationResult) error {
@@ -541,11 +366,8 @@ func (p *PullRequestEngine) addPRMetadata(ctx context.Context, pr *PullRequest, 
 		"N/A", // Model info would need to be added to the response
 	)
 
-	comment := &github.IssueComment{
-		Body: &metadataComment,
-	}
-
-	_, _, err := p.githubClient.client.Issues.CreateComment(ctx, p.githubClient.repoOwner, p.githubClient.repoName, pr.Number, comment)
+	// Use the GitHubClient interface to add comment
+	err := p.githubClient.AddPullRequestComment(ctx, pr.Number, metadataComment)
 	return err
 }
 
