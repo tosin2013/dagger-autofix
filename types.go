@@ -18,6 +18,7 @@ type WorkflowRun struct {
 	Name       string    `json:"name"`
 	Status     string    `json:"status"`     // queued, in_progress, completed
 	Conclusion string    `json:"conclusion"` // success, failure, cancelled, timed_out
+	Event      string    `json:"event"`      // push, pull_request, workflow_dispatch
 	Branch     string    `json:"branch"`
 	CommitSHA  string    `json:"commit_sha"`
 	CreatedAt  time.Time `json:"created_at"`
