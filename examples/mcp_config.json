@@ -1,0 +1,10 @@
+{
+  "github_mcp": {
+    "server_command": ["npx", "-y", "@github/github-mcp-server"],
+    "server_args": [],
+    "server_env": {
+      "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+    },
+    "timeout": 30
+  }
+}

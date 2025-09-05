@@ -46,6 +46,10 @@ type DaggerAutofix struct {
 	RepoName     string
 	TargetBranch string
 	MinCoverage  int
+	
+	// MCP Configuration
+	MCPEnabled     bool
+	MCPGitHubConfig *MCPConfig
 
 	// Internal state
 	logger        *logrus.Logger
@@ -121,6 +125,13 @@ func (m *DaggerAutofix) WithTargetBranch(branch string) *DaggerAutofix {
 	return m
 }
 
+// WithMCPGitHub configures MCP GitHub integration
+func (m *DaggerAutofix) WithMCPGitHub(config *MCPConfig) *DaggerAutofix {
+	m.MCPEnabled = true
+	m.MCPGitHubConfig = config
+	return m
+}
+
 // WithMinCoverage configures minimum test coverage requirement (default: 85%)
 func (m *DaggerAutofix) WithMinCoverage(coverage int) *DaggerAutofix {
 	m.MinCoverage = coverage
@@ -133,11 +144,34 @@ func (m *DaggerAutofix) Initialize(ctx context.Context) (*DaggerAutofix, error) 
 		return nil, fmt.Errorf("configuration validation failed: %w", err)
 	}
 
-	// Initialize GitHub client
-	ghClient, err := newGitHubIntegration(ctx, m.GitHubToken, m.RepoOwner, m.RepoName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize GitHub client: %w", err)
+	// Initialize GitHub client (MCP or direct)
+	var ghClient GitHubClient
+	var err error
+	
+	if m.MCPEnabled && m.MCPGitHubConfig != nil {
+		// Use MCP GitHub client
+		mcpClient, mcpErr := NewMCPGitHubClient(m.MCPGitHubConfig, m.logger)
+		if mcpErr != nil {
+			return nil, fmt.Errorf("failed to initialize MCP GitHub client: %w", mcpErr)
+		}
+		
+		// Connect to MCP server
+		if connectErr := mcpClient.Connect(ctx); connectErr != nil {
+			return nil, fmt.Errorf("failed to connect to GitHub MCP server: %w", connectErr)
+		}
+		
+		ghClient = mcpClient
+		m.logger.Info("Using MCP GitHub client")
+	} else {
+		// Use direct GitHub client
+		directClient, directErr := newGitHubIntegration(ctx, m.GitHubToken, m.RepoOwner, m.RepoName)
+		if directErr != nil {
+			return nil, fmt.Errorf("failed to initialize GitHub client: %w", directErr)
+		}
+		ghClient = directClient
+		m.logger.Info("Using direct GitHub client")
 	}
+	
 	m.githubClient = ghClient
 
 	// Initialize LLM client
@@ -153,8 +187,15 @@ func (m *DaggerAutofix) Initialize(ctx context.Context) (*DaggerAutofix, error) 
 	// Initialize test engine
 	m.testEngine = newTestEngine(m.MinCoverage, m.logger)
 
-	// Initialize PR engine
-	m.prEngine = newPullRequestEngine(ghClient, m.logger)
+	// Initialize PR engine (currently requires direct GitHub client)
+	// TODO: Refactor PR engine to use GitHubClient interface
+	if directClient, ok := ghClient.(*GitHubIntegration); ok {
+		m.prEngine = newPullRequestEngine(directClient, m.logger)
+	} else {
+		// For MCP clients, we'll need to implement PR engine functionality via MCP
+		// For now, disable PR engine when using MCP
+		m.logger.Warn("PR engine not available with MCP client yet")
+	}
 
 	m.logger.Info("DaggerAutofix initialized successfully")
 	return m, nil

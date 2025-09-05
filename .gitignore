@@ -27,3 +27,5 @@ Thumbs.db
 # Test artifacts
 test-results/
 test-output/
+
+CLAUDE.md
