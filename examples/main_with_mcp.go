@@ -11,7 +11,7 @@ import (
 
 // Example of using dagger-autofix with MCP GitHub integration
 func main() {
-	ctx := context.Background()
+	_ = context.Background()
 	
 	// Load MCP configuration
 	configFile := "examples/mcp_config.json"
@@ -20,34 +20,20 @@ func main() {
 		log.Fatalf("Failed to read MCP config: %v", err)
 	}
 	
+	// Example configuration structure (would use actual types from main package)
 	var config struct {
-		GitHubMCP *MCPConfig `json:"github_mcp"`
+		GitHubMCP interface{} `json:"github_mcp"`
 	}
 	
 	if err := json.Unmarshal(configData, &config); err != nil {
 		log.Fatalf("Failed to parse MCP config: %v", err)
 	}
 	
-	// Create Dagger autofix instance with MCP
-	autofix := New().
-		WithRepository("your-org", "your-repo").
-		WithMCPGitHub(config.GitHubMCP).
-		WithLLMProvider("openai", nil) // You'd provide actual API key
+	// This example demonstrates the structure but cannot directly import the main package
+	// In practice, you would build a CLI binary and use it directly or structure as library
+	log.Println("Configuration loaded successfully!")
+	log.Println("To use MCP integration, run the compiled binary with appropriate MCP flags")
 	
-	// Initialize the autofix agent
-	agent, err := autofix.Initialize(ctx)
-	if err != nil {
-		log.Fatalf("Failed to initialize agent: %v", err)
-	}
-	
-	logrus.Info("MCP-enabled GitHub autofix agent initialized successfully!")
-	
-	// Example: Get a workflow run
-	run, err := agent.AnalyzeFailure(ctx, 12345) // Replace with actual run ID
-	if err != nil {
-		log.Printf("Failed to analyze failure: %v", err)
-		return
-	}
-	
-	logrus.Infof("Analyzed failure: %s", run.ID)
+	logrus.Info("Example MCP configuration loaded successfully!")
+	logrus.Info("Use the compiled binary with --mcp-config flag to enable MCP integration")
 }

@@ -13,10 +13,22 @@ import (
 // mock implementations
 
 type mockGitHub struct {
+	// Workflow operations
 	getWorkflowRunFunc        func(ctx context.Context, runID int64) (*WorkflowRun, error)
 	getWorkflowLogsFunc       func(ctx context.Context, runID int64) (*WorkflowLogs, error)
 	getFailedWorkflowRunsFunc func(ctx context.Context) ([]*WorkflowRun, error)
 	createTestBranchFunc      func(ctx context.Context, branchName string, changes []CodeChange) (func(), error)
+	
+	// Pull request operations
+	createPullRequestFunc    func(ctx context.Context, options *PRCreationOptions) (*PullRequest, error)
+	updatePullRequestFunc    func(ctx context.Context, prNumber int, updates *PRUpdateOptions) (*PullRequest, error)
+	getPullRequestFunc       func(ctx context.Context, prNumber int) (*PullRequest, error)
+	closePullRequestFunc     func(ctx context.Context, prNumber int) error
+	addPullRequestCommentFunc func(ctx context.Context, prNumber int, comment string) error
+	
+	// Repository information
+	repoOwner string
+	repoName  string
 }
 
 func (m *mockGitHub) GetWorkflowRun(ctx context.Context, runID int64) (*WorkflowRun, error) {
@@ -45,6 +57,51 @@ func (m *mockGitHub) CreateTestBranch(ctx context.Context, branchName string, ch
 		return m.createTestBranchFunc(ctx, branchName, changes)
 	}
 	return func() {}, nil
+}
+
+// Pull request operations
+func (m *mockGitHub) CreatePullRequest(ctx context.Context, options *PRCreationOptions) (*PullRequest, error) {
+	if m.createPullRequestFunc != nil {
+		return m.createPullRequestFunc(ctx, options)
+	}
+	return nil, nil
+}
+
+func (m *mockGitHub) UpdatePullRequest(ctx context.Context, prNumber int, updates *PRUpdateOptions) (*PullRequest, error) {
+	if m.updatePullRequestFunc != nil {
+		return m.updatePullRequestFunc(ctx, prNumber, updates)
+	}
+	return nil, nil
+}
+
+func (m *mockGitHub) GetPullRequest(ctx context.Context, prNumber int) (*PullRequest, error) {
+	if m.getPullRequestFunc != nil {
+		return m.getPullRequestFunc(ctx, prNumber)
+	}
+	return nil, nil
+}
+
+func (m *mockGitHub) ClosePullRequest(ctx context.Context, prNumber int) error {
+	if m.closePullRequestFunc != nil {
+		return m.closePullRequestFunc(ctx, prNumber)
+	}
+	return nil
+}
+
+func (m *mockGitHub) AddPullRequestComment(ctx context.Context, prNumber int, comment string) error {
+	if m.addPullRequestCommentFunc != nil {
+		return m.addPullRequestCommentFunc(ctx, prNumber, comment)
+	}
+	return nil
+}
+
+// Repository information
+func (m *mockGitHub) GetRepoOwner() string {
+	return m.repoOwner
+}
+
+func (m *mockGitHub) GetRepoName() string {
+	return m.repoName
 }
 
 type mockFailureAnalysisEngine struct {
