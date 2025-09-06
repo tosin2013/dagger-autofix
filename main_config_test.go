@@ -108,7 +108,7 @@ func TestInitializeAndEnsureInitialized(t *testing.T) {
 		newTestEngine = func(minCoverage int, logger *logrus.Logger) *TestEngine {
 			return &TestEngine{}
 		}
-		newPullRequestEngine = func(gh *GitHubIntegration, logger *logrus.Logger) *PullRequestEngine {
+		newPullRequestEngine = func(githubClient GitHubClient, logger *logrus.Logger) *PullRequestEngine {
 			return &PullRequestEngine{}
 		}
 

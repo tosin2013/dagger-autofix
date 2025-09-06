@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -239,6 +240,144 @@ func (m *MCPGitHubClient) CreateTestBranch(ctx context.Context, branchName strin
 	}
 
 	return cleanup, nil
+}
+
+// CreatePullRequest creates a pull request via MCP
+func (m *MCPGitHubClient) CreatePullRequest(ctx context.Context, options *PRCreationOptions) (*PullRequest, error) {
+	args := map[string]interface{}{
+		"title": options.Title,
+		"body":  options.Body,
+		"head":  options.BranchName,
+		"base":  options.TargetBranch,
+		"draft": options.Draft,
+	}
+
+	// Add optional fields
+	if len(options.Labels) > 0 {
+		args["labels"] = options.Labels
+	}
+	if len(options.Reviewers) > 0 {
+		args["reviewers"] = options.Reviewers
+	}
+	if len(options.Assignees) > 0 {
+		args["assignees"] = options.Assignees
+	}
+
+	result, err := m.CallTool(ctx, "create_pull_request", args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pull request via MCP: %w", err)
+	}
+
+	var pr PullRequest
+	if err := parseToolResult(result, &pr); err != nil {
+		return nil, fmt.Errorf("failed to parse pull request result: %w", err)
+	}
+
+	return &pr, nil
+}
+
+// UpdatePullRequest updates a pull request via MCP
+func (m *MCPGitHubClient) UpdatePullRequest(ctx context.Context, prNumber int, updates *PRUpdateOptions) (*PullRequest, error) {
+	args := map[string]interface{}{
+		"pull_number": prNumber,
+	}
+
+	if updates.Title != nil {
+		args["title"] = *updates.Title
+	}
+	if updates.Body != nil {
+		args["body"] = *updates.Body
+	}
+	if updates.State != nil {
+		args["state"] = *updates.State
+	}
+	if len(updates.Labels) > 0 {
+		args["labels"] = updates.Labels
+	}
+
+	result, err := m.CallTool(ctx, "update_pull_request", args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update pull request via MCP: %w", err)
+	}
+
+	var pr PullRequest
+	if err := parseToolResult(result, &pr); err != nil {
+		return nil, fmt.Errorf("failed to parse pull request result: %w", err)
+	}
+
+	return &pr, nil
+}
+
+// GetPullRequest retrieves a pull request via MCP
+func (m *MCPGitHubClient) GetPullRequest(ctx context.Context, prNumber int) (*PullRequest, error) {
+	result, err := m.CallTool(ctx, "get_pull_request", map[string]interface{}{
+		"pull_number": prNumber,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pull request via MCP: %w", err)
+	}
+
+	var pr PullRequest
+	if err := parseToolResult(result, &pr); err != nil {
+		return nil, fmt.Errorf("failed to parse pull request result: %w", err)
+	}
+
+	return &pr, nil
+}
+
+// ClosePullRequest closes a pull request via MCP
+func (m *MCPGitHubClient) ClosePullRequest(ctx context.Context, prNumber int) error {
+	_, err := m.CallTool(ctx, "close_pull_request", map[string]interface{}{
+		"pull_number": prNumber,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to close pull request via MCP: %w", err)
+	}
+	return nil
+}
+
+// AddPullRequestComment adds a comment to a pull request via MCP
+func (m *MCPGitHubClient) AddPullRequestComment(ctx context.Context, prNumber int, comment string) error {
+	_, err := m.CallTool(ctx, "add_pull_request_comment", map[string]interface{}{
+		"pull_number": prNumber,
+		"body":        comment,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add pull request comment via MCP: %w", err)
+	}
+	return nil
+}
+
+// GetRepoOwner returns the repository owner (from config or environment)
+func (m *MCPGitHubClient) GetRepoOwner() string {
+	// Check if repo owner is set in the MCP config environment
+	if m.config != nil && m.config.ServerEnv != nil {
+		if owner, exists := m.config.ServerEnv["REPO_OWNER"]; exists && owner != "" {
+			return owner
+		}
+	}
+	// Fall back to environment variable
+	if owner := os.Getenv("REPO_OWNER"); owner != "" {
+		return owner
+	}
+	m.logger.Warn("Repository owner not configured, using default")
+	return "repo-owner"
+}
+
+// GetRepoName returns the repository name (from config or environment)
+func (m *MCPGitHubClient) GetRepoName() string {
+	// Check if repo name is set in the MCP config environment
+	if m.config != nil && m.config.ServerEnv != nil {
+		if name, exists := m.config.ServerEnv["REPO_NAME"]; exists && name != "" {
+			return name
+		}
+	}
+	// Fall back to environment variable
+	if name := os.Getenv("REPO_NAME"); name != "" {
+		return name
+	}
+	m.logger.Warn("Repository name not configured, using default")
+	return "repo-name"
 }
 
 // parseToolResult parses MCP tool result into target struct
