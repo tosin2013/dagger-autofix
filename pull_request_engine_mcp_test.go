@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -101,8 +102,9 @@ func TestPullRequestEngine_WithMockClient(t *testing.T) {
 		{
 			name: "create fix PR with mock client",
 			setupMock: func(m *MockGitHubClient) {
+				m.On("CreateTestBranch", mock.Anything, mock.Anything, mock.Anything).Return(func() {}, nil)
 				m.On("CreatePullRequest", mock.Anything, mock.MatchedBy(func(opts *PRCreationOptions) bool {
-					return opts.BranchName == "autofix/test-failure-fix-123" &&
+					return strings.HasPrefix(opts.BranchName, "autofix/code_change/") &&
 						opts.TargetBranch == "main"
 				})).Return(&PullRequest{
 					Number: 100,
@@ -110,18 +112,25 @@ func TestPullRequestEngine_WithMockClient(t *testing.T) {
 					URL:    "https://github.com/test/repo/pull/100",
 					State:  "open",
 				}, nil)
+				m.On("AddPullRequestComment", mock.Anything, 100, mock.AnythingOfType("string")).Return(nil)
 			},
 			operation: func(pr *PullRequestEngine) error {
 				analysis := &FailureAnalysisResult{
 					Classification: FailureClassification{
-						Category: "test_failure",
+				Type:       "test_failure",
+				Severity:   "low",
+				Confidence: 0.8,
+				Category:   "test_failure",
 					},
+			Context:     FailureContext{},
 					RootCause:   "Missing import statement",
 				}
 				fix := &FixValidationResult{
 					Valid: true,
 					Fix: &ProposedFix{
 						ID: "fix-123",
+					Type:        "code_change",
+					Confidence:  0.9,
 						Description: "Fix missing import",
 					},
 				}
@@ -168,7 +177,7 @@ func TestPullRequestEngine_WithMockClient(t *testing.T) {
 			name: "close PR with mock client",
 			setupMock: func(m *MockGitHubClient) {
 				m.On("AddPullRequestComment", mock.Anything, 456, mock.MatchedBy(func(comment string) bool {
-					return comment == "Closing PR: Test completed"
+					return comment == "Test completed"
 				})).Return(nil)
 				m.On("ClosePullRequest", mock.Anything, 456).Return(nil)
 			},
@@ -239,9 +248,9 @@ func TestPullRequestEngine_HandleErrors(t *testing.T) {
 
 	t.Run("create PR error handling", func(t *testing.T) {
 		mockClient := new(MockGitHubClient)
-		mockClient.On("CreatePullRequest", mock.Anything, mock.Anything).
-			Return(nil, fmt.Errorf("API rate limit exceeded"))
+		mockClient.On("CreateTestBranch", mock.Anything, mock.Anything, mock.Anything).Return(func() {}, nil)
 
+		mockClient.On("CreatePullRequest", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("API rate limit exceeded"))
 		prEngine := NewPullRequestEngine(mockClient, logger)
 
 		analysis := &FailureAnalysisResult{

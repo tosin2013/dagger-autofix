@@ -219,7 +219,12 @@ func (p *PullRequestEngine) generatePRTitle(analysis *FailureAnalysisResult, fix
 	fixType := caser.String(string(fix.Type))
 	failureType := caser.String(string(analysis.Classification.Type))
 
-	return fmt.Sprintf("🤖 Auto-fix: %s for %s failure (Run #%d)", fixType, failureType, analysis.Context.WorkflowRun.ID)
+	runID := int64(0)
+	if analysis.Context.WorkflowRun != nil {
+		runID = analysis.Context.WorkflowRun.ID
+	}
+
+	return fmt.Sprintf("🤖 Auto-fix: %s for %s failure (Run #%d)", fixType, failureType, runID)
 }
 
 func (p *PullRequestEngine) generatePRBody(analysis *FailureAnalysisResult, fix *FixValidationResult) string {
@@ -230,7 +235,11 @@ func (p *PullRequestEngine) generatePRBody(analysis *FailureAnalysisResult, fix 
 
 	// Failure summary
 	body.WriteString("## 📊 Failure Analysis\n\n")
-	body.WriteString(fmt.Sprintf("**Workflow Run**: [#%d](%s)\n", analysis.Context.WorkflowRun.ID, analysis.Context.WorkflowRun.URL))
+	if analysis.Context.WorkflowRun != nil {
+		body.WriteString(fmt.Sprintf("**Workflow Run**: [#%d](%s)\n", analysis.Context.WorkflowRun.ID, analysis.Context.WorkflowRun.URL))
+	} else {
+		body.WriteString("**Workflow Run**: Not available\n")
+	}
 	body.WriteString(fmt.Sprintf("**Failure Type**: %s\n", analysis.Classification.Type))
 	body.WriteString(fmt.Sprintf("**Severity**: %s\n", analysis.Classification.Severity))
 	body.WriteString(fmt.Sprintf("**Confidence**: %.1f%%\n", analysis.Classification.Confidence*100))
@@ -262,9 +271,13 @@ func (p *PullRequestEngine) generatePRBody(analysis *FailureAnalysisResult, fix 
 
 	// Test results
 	body.WriteString("## 🧪 Validation Results\n\n")
-	body.WriteString(fmt.Sprintf("**Tests Passed**: %s\n", boolToEmoji(fix.TestResult.Success)))
-	body.WriteString(fmt.Sprintf("**Test Coverage**: %.1f%% (Required: 85%%)\n", fix.TestResult.Coverage))
-	body.WriteString(fmt.Sprintf("**Tests Run**: %d passed, %d failed, %d skipped\n\n", fix.TestResult.PassedTests, fix.TestResult.FailedTests, fix.TestResult.SkippedTests))
+	if fix.TestResult != nil {
+		body.WriteString(fmt.Sprintf("**Tests Passed**: %s\n", boolToEmoji(fix.TestResult.Success)))
+		body.WriteString(fmt.Sprintf("**Test Coverage**: %.1f%% (Required: 85%%)\n", fix.TestResult.Coverage))
+		body.WriteString(fmt.Sprintf("**Tests Run**: %d passed, %d failed, %d skipped\n\n", fix.TestResult.PassedTests, fix.TestResult.FailedTests, fix.TestResult.SkippedTests))
+	} else {
+		body.WriteString("**Test Results**: Not available\n\n")
+	}
 
 	// Risks and benefits
 	if len(fix.Fix.Risks) > 0 {
@@ -339,6 +352,12 @@ func (p *PullRequestEngine) createPullRequest(ctx context.Context, options *PRCr
 }
 
 func (p *PullRequestEngine) addPRMetadata(ctx context.Context, pr *PullRequest, analysis *FailureAnalysisResult, fix *FixValidationResult) error {
+		validationDuration := "N/A"
+		testOutput := "N/A"
+		if fix.TestResult != nil {
+			validationDuration = fix.TestResult.Duration.String()
+			testOutput = truncateString(fix.TestResult.Output, 500)
+		}
 	// Add a comment with additional metadata
 	metadataComment := fmt.Sprintf(`## 🔍 Additional Metadata
 
@@ -360,8 +379,8 @@ func (p *PullRequestEngine) addPRMetadata(ctx context.Context, pr *PullRequest, 
 		len(analysis.ErrorPatterns),
 		len(analysis.AffectedFiles),
 		strings.Join(analysis.Classification.Tags, ", "),
-		fix.TestResult.Duration,
-		truncateString(fix.TestResult.Output, 500),
+		validationDuration,
+		testOutput,
 		analysis.LLMProvider,
 		"N/A", // Model info would need to be added to the response
 	)

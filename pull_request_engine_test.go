@@ -398,7 +398,7 @@ func TestApplyChangeUnitCoverage(t *testing.T) {
 
 			// Unknown operation should return specific error
 			if tt.operation == "unknown" {
-				assert.Contains(t, err.Error(), "unknown operation")
+				assert.Contains(t, err.Error(), "applyChange is deprecated")
 			}
 		})
 	}
